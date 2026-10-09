@@ -1,0 +1,34 @@
+import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_dimens.dart';
+import '../../../data/models/menu_item_data.dart';
+import '../../../shared/widgets/app_card.dart';
+import '../../../shared/widgets/menu_grid.dart';
+import '../../../shared/widgets/section_header.dart';
+
+/// Section "Layanan Keuangan" berisi grid 4 kolom.
+class FinancialServicesSection extends StatelessWidget {
+  const FinancialServicesSection({super.key, required this.items});
+
+  final List<MenuItemData> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const SectionHeader(
+          title: 'Layanan Keuangan',
+          actionLabel: 'Lihat Semua',
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppCard(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.lg,
+          ),
+          child: MenuGrid(items: items, rowSpacing: AppSpacing.lg),
+        ),
+      ],
+    );
+  }
+}

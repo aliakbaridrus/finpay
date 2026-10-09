@@ -1,0 +1,117 @@
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../models/menu_item_data.dart';
+import '../models/transaction_model.dart';
+
+/// Data dummy untuk tampilan Beranda.
+/// Ganti dengan data dari API / repository saat integrasi backend.
+abstract final class DummyData {
+  // ---------- Profil & Saldo ----------
+  static const String userName = 'Reza Pratama';
+  static const String membership = 'FinPay Premium';
+  static const int finPoin = 1420;
+  static const String phoneNumber = '0812-3456-7890';
+
+  static const int totalBalance = 14850000;
+  static const int cashBalance = 12350000;
+  static const int savingBalance = 2500000;
+
+  // ---------- Quick Actions ----------
+  static const List<MenuItemData> quickActions = [
+    MenuItemData(
+      label: 'Top Up',
+      icon: Icons.add_circle_outline_rounded,
+      badge: MenuBadge.text('QRIS', color: AppColors.textPrimary),
+    ),
+    MenuItemData(
+      label: 'Transfer',
+      icon: Icons.swap_horiz_rounded,
+      backgroundColor: AppColors.mintLight,
+      iconColor: Color(0xFF0F766E),
+    ),
+    MenuItemData(label: 'Tarik Tunai', icon: Icons.payments_outlined),
+    MenuItemData(
+      label: 'QRIS Pay',
+      icon: Icons.qr_code_scanner_rounded,
+      backgroundColor: AppColors.primary,
+      iconColor: Colors.white,
+    ),
+  ];
+
+  // ---------- Layanan Keuangan ----------
+  static const List<MenuItemData> services = [
+    MenuItemData(
+        label: 'Isi Saldo', icon: Icons.account_balance_wallet_outlined),
+    MenuItemData(label: 'Kirim Uang', icon: Icons.send_to_mobile_outlined),
+    MenuItemData(
+      label: 'Menabung',
+      icon: Icons.savings_outlined,
+      badge: MenuBadge.dot(color: AppColors.success),
+    ),
+    MenuItemData(
+      label: 'Pinjaman',
+      icon: Icons.request_quote_outlined,
+      badge: MenuBadge.text('OJK', color: AppColors.danger),
+    ),
+    MenuItemData(label: 'Cash Flow', icon: Icons.donut_large_rounded),
+    MenuItemData(label: 'Tagihan', icon: Icons.receipt_long_outlined),
+    MenuItemData(label: 'Investasi', icon: Icons.trending_up_rounded),
+    MenuItemData(label: 'Promo Fin', icon: Icons.redeem_outlined),
+  ];
+
+  // ---------- Sorotan Keuangan ----------
+  static const String highlightPeriod = 'Bulan Oktober 2024';
+  static const int monthlyIncome = 8500000;
+  static const int monthlyExpense = 3650000;
+  static const String incomeGrowth = '+14% dr bln lalu';
+  static const String expenseNote = '42% batas aman';
+
+  // ---------- Target Menabung ----------
+  static const String savingGoalTitle = 'Target Menabung: Liburan ke Jepang';
+  static const int savingGoalMonthly = 500000;
+  static const int savingGoalCurrent = 7500000;
+  static const int savingGoalTarget = 15000000;
+  static const String savingGoalEta = 'Mei 2025';
+
+  // ---------- Pinjaman Instan ----------
+  static const int loanMaxAmount = 25000000;
+  static const int loanMinInstallment = 350000;
+  static const String loanInterest = 'Bunga 0.9%/bln';
+
+  // ---------- Riwayat Transaksi ----------
+  static const List<TransactionModel> transactions = [
+    TransactionModel(
+      title: 'Top Up QRIS Admin',
+      dateTime: '24 Okt, 18:20',
+      channel: 'BCA Virtual',
+      amount: 500000,
+      icon: Icons.qr_code_2_rounded,
+      type: TransactionType.income,
+    ),
+    TransactionModel(
+      title: 'Transfer ke Budi Santoso',
+      dateTime: '24 Okt, 09:15',
+      channel: 'Antar FinPay',
+      amount: -250000,
+      icon: Icons.person_outline_rounded,
+      type: TransactionType.expense,
+    ),
+    TransactionModel(
+      title: 'Pindahke Tabungan Impian',
+      dateTime: '23 Okt, 18:00',
+      channel: 'Auto-debet',
+      amount: -1000000,
+      icon: Icons.savings_outlined,
+      type: TransactionType.saving,
+    ),
+    TransactionModel(
+      title: 'Pencairan Dana Instan',
+      dateTime: '20 Okt, 11:30',
+      channel: 'FinPay Loan',
+      amount: 5000000,
+      icon: Icons.account_balance_wallet_outlined,
+      type: TransactionType.income,
+    ),
+  ];
+}
