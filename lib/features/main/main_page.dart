@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_text_styles.dart';
+import '../account/account_page.dart';
 import '../home/home_page.dart';
 import 'widgets/finpay_bottom_nav_bar.dart';
 
@@ -45,6 +46,7 @@ class _MainPageState extends State<MainPage> {
 
   Widget _buildPage(int index) {
     if (index == 0) return const HomePage();
+    if (index == 4) return const AccountPage();
     // Placeholder untuk halaman lain yang belum dibuat.
     return Center(
       child: Text(_navItems[index].label, style: AppTextStyles.h2),
