@@ -1,20 +1,18 @@
-# finpay
+# FinPay - Finance App 🚀
 
-A new Flutter project.
+Aplikasi keuangan berbasis Flutter yang dikembangkan sebagai proyek pembelajaran kelompok.
 
-## Getting Started
+## 📱 Fitur Utama
+* **Beranda**: Ringkasan saldo, statistik transaksi, dan akses cepat.
+* **Riwayat**: Catatan riwayat transaksi pengguna.
+* **Bayar**: Fitur pembayaran via QR Code.
+* **Keuangan**: Manajemen saldo dan informasi rekening/kartu.
+* **Akun**: Profil pengguna, pengaturan keamanan, dan preferensi aplikasi.
 
-This project is a starting point for a Flutter application.
+## 🛠️ Teknologi & Libs
+* **Framework**: Flutter (Dart)
+* **UI/Theme**: Custom AppTheme & Modern Components
+* **Version Control**: Git & GitHub
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-
-initial ali
-ardi
+## 👥 Tim Pengembang
+* Kelompok 6 - Mobile Programming
