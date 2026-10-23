@@ -13,7 +13,8 @@ class MyQrPage extends StatelessWidget {
   const MyQrPage({super.key});
 
   void _copyNumber(BuildContext context) {
-    Clipboard.setData(const ClipboardData(text: DummyData.phoneNumber));
+    // Kode yang benar:
+    Clipboard.setData(ClipboardData(text: DummyData.phoneNumber));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Nomor FinPay disalin')),
     );

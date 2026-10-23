@@ -73,7 +73,7 @@ class _ProfilePageState extends State<ProfilePage> {
         AppCard(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
           child: Column(
-            children: const [
+            children:  [
               _FieldRow(label: 'Nama Lengkap', value: DummyData.userName),
               _FieldDivider(),
               _FieldRow(label: 'NIK', value: '3174 •••• •••• 0001'),
