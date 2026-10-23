@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/dummy/dummy_data.dart';
+import '../services/service_navigation_helper.dart';
 import 'widgets/balance_card.dart';
 import 'widgets/cash_flow_card.dart';
 import 'widgets/financial_services_section.dart';
@@ -16,11 +17,19 @@ import 'widgets/security_info_card.dart';
 import 'widgets/transaction_history_section.dart';
 
 /// Halaman Beranda FinPay.
-///
-/// Setiap section dipisah menjadi widget tersendiri di folder `widgets/`
-/// sehingga urutan, jarak, maupun isi section mudah diatur dari sini.
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key, this.onNavigateToHistory});
+
+  final VoidCallback? onNavigateToHistory;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  void _refresh() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,32 +69,60 @@ class HomePage extends StatelessWidget {
 
   List<Widget> _buildSections() {
     return [
-      const GreetingSection(
+      GreetingSection(
         userName: DummyData.userName,
         membership: DummyData.membership,
         points: DummyData.finPoin,
       ),
       const SizedBox(height: AppSpacing.lg),
-      const BalanceCard(
+      BalanceCard(
         totalBalance: DummyData.totalBalance,
         cashBalance: DummyData.cashBalance,
         savingBalance: DummyData.savingBalance,
         phoneNumber: DummyData.phoneNumber,
       ),
       const SizedBox(height: AppSpacing.lg),
-      const QuickActions(items: DummyData.quickActions),
+      QuickActions(
+        items: DummyData.quickActions,
+        onItemTap: (item) {
+          ServiceNavigationHelper.openService(
+            context,
+            item.label,
+            onStateChanged: _refresh,
+          );
+        },
+      ),
       const SizedBox(height: AppSpacing.section),
-      const FinancialServicesSection(items: DummyData.services),
+      FinancialServicesSection(
+        items: DummyData.services,
+        onItemTap: (item) {
+          ServiceNavigationHelper.openService(
+            context,
+            item.label,
+            onStateChanged: _refresh,
+          );
+        },
+      ),
       const SizedBox(height: AppSpacing.section),
       _buildHighlightsSection(),
       const SizedBox(height: AppSpacing.lg),
-      const InstantLoanBanner(
+      InstantLoanBanner(
         maxAmount: DummyData.loanMaxAmount,
         minInstallment: DummyData.loanMinInstallment,
         interestLabel: DummyData.loanInterest,
+        onApplyTap: () {
+          ServiceNavigationHelper.openService(
+            context,
+            'Pinjaman',
+            onStateChanged: _refresh,
+          );
+        },
       ),
       const SizedBox(height: AppSpacing.section),
-      const TransactionHistorySection(transactions: DummyData.transactions),
+      TransactionHistorySection(
+        transactions: DummyData.transactions,
+        onSeeAllTap: widget.onNavigateToHistory,
+      ),
       const SizedBox(height: AppSpacing.section),
       const SecurityInfoCard(),
     ];
@@ -109,19 +146,37 @@ class HomePage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        const CashFlowCard(
-          income: DummyData.monthlyIncome,
-          expense: DummyData.monthlyExpense,
-          incomeNote: DummyData.incomeGrowth,
-          expenseNote: DummyData.expenseNote,
+        GestureDetector(
+          onTap: () {
+            ServiceNavigationHelper.openService(
+              context,
+              'Cash Flow',
+              onStateChanged: _refresh,
+            );
+          },
+          child: const CashFlowCard(
+            income: DummyData.monthlyIncome,
+            expense: DummyData.monthlyExpense,
+            incomeNote: DummyData.incomeGrowth,
+            expenseNote: DummyData.expenseNote,
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
-        const SavingGoalCard(
-          title: DummyData.savingGoalTitle,
-          monthlyDebit: DummyData.savingGoalMonthly,
-          current: DummyData.savingGoalCurrent,
-          target: DummyData.savingGoalTarget,
-          eta: DummyData.savingGoalEta,
+        GestureDetector(
+          onTap: () {
+            ServiceNavigationHelper.openService(
+              context,
+              'Menabung',
+              onStateChanged: _refresh,
+            );
+          },
+          child: const SavingGoalCard(
+            title: DummyData.savingGoalTitle,
+            monthlyDebit: DummyData.savingGoalMonthly,
+            current: DummyData.savingGoalCurrent,
+            target: DummyData.savingGoalTarget,
+            eta: DummyData.savingGoalEta,
+          ),
         ),
       ],
     );

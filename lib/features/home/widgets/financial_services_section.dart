@@ -8,9 +8,14 @@ import '../../../shared/widgets/section_header.dart';
 
 /// Section "Layanan Keuangan" berisi grid 4 kolom.
 class FinancialServicesSection extends StatelessWidget {
-  const FinancialServicesSection({super.key, required this.items});
+  const FinancialServicesSection({
+    super.key,
+    required this.items,
+    this.onItemTap,
+  });
 
   final List<MenuItemData> items;
+  final void Function(MenuItemData item)? onItemTap;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +31,11 @@ class FinancialServicesSection extends StatelessWidget {
             horizontal: AppSpacing.sm,
             vertical: AppSpacing.lg,
           ),
-          child: MenuGrid(items: items, rowSpacing: AppSpacing.lg),
+          child: MenuGrid(
+            items: items,
+            rowSpacing: AppSpacing.lg,
+            onItemTap: onItemTap,
+          ),
         ),
       ],
     );

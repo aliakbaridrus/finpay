@@ -7,9 +7,10 @@ import '../../../shared/widgets/menu_grid.dart';
 
 /// Baris aksi cepat: Top Up, Transfer, Tarik Tunai, QRIS Pay.
 class QuickActions extends StatelessWidget {
-  const QuickActions({super.key, required this.items});
+  const QuickActions({super.key, required this.items, this.onItemTap});
 
   final List<MenuItemData> items;
+  final void Function(MenuItemData item)? onItemTap;
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +24,7 @@ class QuickActions extends StatelessWidget {
         crossAxisCount: items.length,
         boxSize: AppSizes.quickActionBox,
         iconSize: AppSizes.iconLg,
+        onItemTap: onItemTap,
       ),
     );
   }
