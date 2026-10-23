@@ -15,12 +15,16 @@ class BalanceCard extends StatefulWidget {
     required this.cashBalance,
     required this.savingBalance,
     required this.phoneNumber,
+    this.onCashTap,
+    this.onSavingTap,
   });
 
   final int totalBalance;
   final int cashBalance;
   final int savingBalance;
   final String phoneNumber;
+  final VoidCallback? onCashTap;
+  final VoidCallback? onSavingTap;
 
   @override
   State<BalanceCard> createState() => _BalanceCardState();
@@ -161,10 +165,13 @@ class _BalanceCardState extends State<BalanceCard> {
         child: Row(
           children: [
             Expanded(
-              child: _SubBalanceItem(
-                label: 'FinPay Cash',
-                value: _format(widget.cashBalance),
-                dotColor: AppColors.mint,
+              child: InkWell(
+                onTap: widget.onCashTap,
+                child: _SubBalanceItem(
+                  label: 'FinPay Cash',
+                  value: _format(widget.cashBalance),
+                  dotColor: AppColors.mint,
+                ),
               ),
             ),
             VerticalDivider(
@@ -173,10 +180,13 @@ class _BalanceCardState extends State<BalanceCard> {
               width: AppSpacing.xxl,
             ),
             Expanded(
-              child: _SubBalanceItem(
-                label: 'Tabungan',
-                value: _format(widget.savingBalance),
-                dotColor: AppColors.gold,
+              child: InkWell(
+                onTap: widget.onSavingTap,
+                child: _SubBalanceItem(
+                  label: 'Tabungan',
+                  value: _format(widget.savingBalance),
+                  dotColor: AppColors.gold,
+                ),
               ),
             ),
           ],

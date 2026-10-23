@@ -8,19 +8,26 @@ import '../../../data/models/transaction_model.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/icon_box.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../history/transaction_detail_page.dart';
 
 /// Section "Riwayat Transaksi" dengan chip filter yang interaktif.
 class TransactionHistorySection extends StatefulWidget {
-  const TransactionHistorySection({super.key, required this.transactions});
+  const TransactionHistorySection({
+    super.key,
+    required this.transactions,
+    this.onSeeAllTap,
+  });
 
   final List<TransactionModel> transactions;
+  final VoidCallback? onSeeAllTap;
 
   @override
   State<TransactionHistorySection> createState() =>
       _TransactionHistorySectionState();
 }
 
-class _TransactionHistorySectionState extends State<TransactionHistorySection> {
+class _TransactionHistorySectionState
+    extends State<TransactionHistorySection> {
   TransactionFilter _selectedFilter = TransactionFilter.all;
 
   List<TransactionModel> get _filtered =>
@@ -33,10 +40,11 @@ class _TransactionHistorySectionState extends State<TransactionHistorySection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(
+        SectionHeader(
           title: 'Riwayat Transaksi',
           actionLabel: 'Lihat Semua',
-          showChevron: false,
+          onActionTap: widget.onSeeAllTap,
+          showChevron: true,
         ),
         const SizedBox(height: AppSpacing.md),
         _FilterChips(
@@ -60,7 +68,19 @@ class _TransactionHistorySectionState extends State<TransactionHistorySection> {
                       for (var i = 0; i < items.length; i++) ...[
                         if (i > 0)
                           const Divider(height: 1, color: AppColors.border),
-                        _TransactionTile(transaction: items[i]),
+                        _TransactionTile(
+                          transaction: items[i],
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (context) => TransactionDetailPage(
+                                  transaction: items[i],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ],
                   ),
@@ -139,63 +159,67 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.transaction});
+  const _TransactionTile({required this.transaction, required this.onTap});
 
   final TransactionModel transaction;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final amountColor =
         transaction.isIncoming ? AppColors.success : AppColors.danger;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      child: Row(
-        children: [
-          IconBox(
-            icon: transaction.icon,
-            size: AppSizes.transactionIconBox,
-            iconSize: AppSizes.iconMd,
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        child: Row(
+          children: [
+            IconBox(
+              icon: transaction.icon,
+              size: AppSizes.transactionIconBox,
+              iconSize: AppSizes.iconMd,
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    transaction.title,
+                    style: AppTextStyles.body.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    transaction.subtitle,
+                    style: AppTextStyles.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  transaction.title,
+                  CurrencyFormatter.rupiah(transaction.amount, withSign: true),
                   style: AppTextStyles.body.copyWith(
-                    fontWeight: FontWeight.w700,
+                    color: amountColor,
+                    fontWeight: FontWeight.w800,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  transaction.subtitle,
-                  style: AppTextStyles.caption,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                _StatusLabel(text: transaction.status),
               ],
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                CurrencyFormatter.rupiah(transaction.amount, withSign: true),
-                style: AppTextStyles.body.copyWith(
-                  color: amountColor,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xxs),
-              _StatusLabel(text: transaction.status),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

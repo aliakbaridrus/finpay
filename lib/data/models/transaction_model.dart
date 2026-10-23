@@ -28,6 +28,11 @@ class TransactionModel {
     required this.icon,
     required this.type,
     this.status = 'Sukses',
+    this.referenceNumber = 'FPX-8920192381',
+    this.category = 'Keuangan',
+    this.adminFee = 0,
+    this.note,
+    this.dateGroup = '24 Oktober 2024',
   });
 
   final String title;
@@ -41,6 +46,11 @@ class TransactionModel {
   final IconData icon;
   final TransactionType type;
   final String status;
+  final String referenceNumber;
+  final String category;
+  final int adminFee;
+  final String? note;
+  final String dateGroup;
 
   bool get isIncoming => amount >= 0;
   String get subtitle => '$dateTime • $channel';
