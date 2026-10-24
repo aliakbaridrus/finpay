@@ -6,7 +6,7 @@ import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/menu_grid.dart';
 import '../../../shared/widgets/section_header.dart';
 
-/// Section "Layanan Keuangan" berisi grid 4 kolom.
+/// Section "Layanan Keuangan" berisi grid 3 kolom (6 layanan).
 class FinancialServicesSection extends StatelessWidget {
   const FinancialServicesSection({
     super.key,
@@ -33,6 +33,7 @@ class FinancialServicesSection extends StatelessWidget {
           ),
           child: MenuGrid(
             items: items,
+            crossAxisCount: 3,
             rowSpacing: AppSpacing.lg,
             onItemTap: onItemTap,
           ),

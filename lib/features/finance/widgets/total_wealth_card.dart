@@ -6,21 +6,19 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../services/service_navigation_helper.dart';
 
-/// Kartu Total Kekayaan / Aset Bersih dengan rincian FinPay Cash, Tabungan, dan Investasi.
+/// Kartu Total Kekayaan / Aset Bersih dengan rincian FinPay Cash dan Tabungan.
 class TotalWealthCard extends StatefulWidget {
   const TotalWealthCard({
     super.key,
     required this.totalWealth,
     required this.cashBalance,
     required this.savingBalance,
-    required this.investmentBalance,
     this.onStateChanged,
   });
 
   final int totalWealth;
   final int cashBalance;
   final int savingBalance;
-  final int investmentBalance;
   final VoidCallback? onStateChanged;
 
   @override
@@ -93,7 +91,7 @@ class _TotalWealthCardState extends State<TotalWealthCard> {
           ),
           const SizedBox(height: AppSpacing.xl),
 
-          // Breakdown Row (Cash, Savings, Investment)
+          // Breakdown Row (Cash & Savings)
           Row(
             children: [
               Expanded(
@@ -111,7 +109,7 @@ class _TotalWealthCardState extends State<TotalWealthCard> {
                   },
                 ),
               ),
-              const SizedBox(width: AppSpacing.xs),
+              const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: _AssetPill(
                   label: 'Tabungan',
@@ -122,22 +120,6 @@ class _TotalWealthCardState extends State<TotalWealthCard> {
                     ServiceNavigationHelper.openService(
                       context,
                       'Menabung',
-                      onStateChanged: widget.onStateChanged,
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: _AssetPill(
-                  label: 'Investasi',
-                  amount: widget.investmentBalance,
-                  icon: Icons.trending_up_rounded,
-                  isVisible: _isBalanceVisible,
-                  onTap: () {
-                    ServiceNavigationHelper.openService(
-                      context,
-                      'Investasi',
                       onStateChanged: widget.onStateChanged,
                     );
                   },
