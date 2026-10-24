@@ -8,7 +8,6 @@ import '../services/service_navigation_helper.dart';
 
 import 'widgets/finance_header.dart';
 import 'widgets/financial_health_card.dart';
-import 'widgets/investment_portfolio_card.dart';
 import 'widgets/saving_goals_section.dart';
 import 'widgets/total_wealth_card.dart';
 
@@ -62,7 +61,6 @@ class _FinancePageState extends State<FinancePage> {
                       totalWealth: DummyData.totalWealth,
                       cashBalance: DummyData.cashBalance,
                       savingBalance: DummyData.savingBalance,
-                      investmentBalance: DummyData.investmentBalance,
                       onStateChanged: _refreshData,
                     ),
                     const SizedBox(height: AppSpacing.section),
@@ -100,14 +98,6 @@ class _FinancePageState extends State<FinancePage> {
 
                     // Target Menabung & Impian
                     SavingGoalsSection(
-                      onStateChanged: _refreshData,
-                    ),
-                    const SizedBox(height: AppSpacing.section),
-
-                    // Portofolio Investasi
-                    InvestmentPortfolioCard(
-                      investmentBalance: DummyData.investmentBalance,
-                      investmentReturn: DummyData.investmentReturn,
                       onStateChanged: _refreshData,
                     ),
                     const SizedBox(height: AppSpacing.section),

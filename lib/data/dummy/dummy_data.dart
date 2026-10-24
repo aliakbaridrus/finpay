@@ -16,10 +16,8 @@ abstract class DummyData {
   static int totalBalance = 14850000;
   static int cashBalance = 12350000;
   static int savingBalance = 2500000;
-  static int investmentBalance = 10000000;
-  static int investmentReturn = 450000; // +4.5%
 
-  static int get totalWealth => cashBalance + savingBalance + investmentBalance;
+  static int get totalWealth => cashBalance + savingBalance;
 
   // ---------- Quick Actions ----------
   static const List<MenuItemData> quickActions = [
@@ -59,8 +57,6 @@ abstract class DummyData {
       badge: MenuBadge.text('OJK', color: AppColors.danger),
     ),
     MenuItemData(label: 'Cash Flow', icon: Icons.donut_large_rounded),
-    MenuItemData(label: 'Tagihan', icon: Icons.receipt_long_outlined),
-    MenuItemData(label: 'Investasi', icon: Icons.trending_up_rounded),
     MenuItemData(label: 'Promo Fin', icon: Icons.redeem_outlined),
   ];
 
@@ -114,19 +110,6 @@ abstract class DummyData {
       note: 'Pembayaran patungan makan siang',
     ),
     const TransactionModel(
-      title: 'Pembelian Token Listrik PLN',
-      dateTime: '24 Okt, 07:30',
-      channel: 'Tagihan FinPay',
-      amount: -101500,
-      icon: Icons.bolt_rounded,
-      type: TransactionType.expense,
-      referenceNumber: 'FPX-90819877',
-      category: 'Tagihan',
-      adminFee: 1500,
-      dateGroup: 'Hari Ini, 24 Oktober 2024',
-      note: 'Token 100rb No. Meter 32189028',
-    ),
-    const TransactionModel(
       title: 'Pindah ke Tabungan Impian',
       dateTime: '23 Okt, 18:00',
       channel: 'Auto-debet',
@@ -172,18 +155,6 @@ abstract class DummyData {
       category: 'Transfer',
       dateGroup: '18 Oktober 2024',
       note: 'Ganti uang tiket bioskop',
-    ),
-    const TransactionModel(
-      title: 'Dividen Reksa Dana Pasar Uang',
-      dateTime: '15 Okt, 08:00',
-      channel: 'FinPay Invest',
-      amount: 45000,
-      icon: Icons.trending_up_rounded,
-      type: TransactionType.income,
-      referenceNumber: 'FPX-88912093',
-      category: 'Investasi',
-      dateGroup: '15 Oktober 2024',
-      note: 'Hasil imbal dividen bulanan',
     ),
     const TransactionModel(
       title: 'Tarik Tunai ATM Bersama',

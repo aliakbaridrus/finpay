@@ -21,10 +21,6 @@ abstract class FinancialActionSheets {
       showSaving(context, onStateChanged: onStateChanged);
     } else if (lower.contains('pinjam') || lower.contains('loan')) {
       showLoan(context, onStateChanged: onStateChanged);
-    } else if (lower.contains('tagihan')) {
-      showBillPayment(context, onStateChanged: onStateChanged);
-    } else if (lower.contains('investasi')) {
-      showInvestment(context, onStateChanged: onStateChanged);
     } else if (lower.contains('tarik')) {
       showCashout(context, onStateChanged: onStateChanged);
     } else if (lower.contains('qris')) {
@@ -73,24 +69,6 @@ abstract class FinancialActionSheets {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _LoanSheet(onSuccess: onStateChanged),
-    );
-  }
-
-  static void showBillPayment(BuildContext context, {VoidCallback? onStateChanged}) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _BillPaymentSheet(onSuccess: onStateChanged),
-    );
-  }
-
-  static void showInvestment(BuildContext context, {VoidCallback? onStateChanged}) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _InvestmentSheet(onSuccess: onStateChanged),
     );
   }
 
@@ -245,10 +223,10 @@ abstract class FinancialActionSheets {
                     ),
                     const SizedBox(height: AppSpacing.md),
                     const _PromoCardTile(
-                      title: 'Diskon Tagihan PLN Rp 15.000',
+                      title: 'Cashback Transfer Antar Bank',
                       subtitle: 'Min. transaksi Rp 100.000 • s.d 15 Nov',
-                      code: 'HEMATPLN',
-                      icon: Icons.bolt_rounded,
+                      code: 'FREEADMIN',
+                      icon: Icons.swap_horiz_rounded,
                       color: AppColors.gold,
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -887,246 +865,7 @@ class _LoanSheetState extends State<_LoanSheet> {
   }
 }
 
-// ==================== 5. BAYAR TAGIHAN SHEET (85% HEIGHT) ====================
-class _BillPaymentSheet extends StatefulWidget {
-  const _BillPaymentSheet({this.onSuccess});
-  final VoidCallback? onSuccess;
-
-  @override
-  State<_BillPaymentSheet> createState() => _BillPaymentSheetState();
-}
-
-class _BillPaymentSheetState extends State<_BillPaymentSheet> {
-  final int _billAmount = 101500;
-
-  void _processBill() {
-    if (_billAmount > DummyData.cashBalance) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saldo kamu tidak mencukupi!')),
-      );
-      return;
-    }
-
-    DummyData.cashBalance -= _billAmount;
-
-    final newTrx = TransactionModel(
-      title: 'Pembelian Token PLN Electricity',
-      dateTime: 'Hari Ini, ${TimeOfDay.now().format(context)}',
-      channel: 'Tagihan FinPay',
-      amount: -_billAmount,
-      icon: Icons.bolt_rounded,
-      type: TransactionType.expense,
-      referenceNumber: 'FPX-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
-      category: 'Tagihan',
-      adminFee: 1500,
-      dateGroup: 'Hari Ini',
-      note: 'Token PLN No. Meter 32189028',
-    );
-
-    DummyData.transactions.insert(0, newTrx);
-    widget.onSuccess?.call();
-
-    Navigator.pop(context);
-    _showReceiptDialog(
-      context,
-      title: 'Pembayaran PLN Berhasil! ⚡',
-      amountText: CurrencyFormatter.rupiah(-_billAmount, withSign: true),
-      amountColor: AppColors.danger,
-      details: [
-        {'label': 'Layanan', 'value': 'Token Listrik PLN'},
-        {'label': 'No. Meter', 'value': '32189028 (An. Reza)'},
-        {'label': 'Kode Token PLN', 'value': '8910-2391-4912-0019'},
-        {'label': 'Sisa Saldo Cash', 'value': CurrencyFormatter.rupiah(DummyData.cashBalance)},
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: AppSpacing.md),
-          Center(
-            child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: AppRadius.pillAll)),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.only(
-                left: AppSpacing.xl,
-                right: AppSpacing.xl,
-                bottom: MediaQuery.of(context).padding.bottom + AppSpacing.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Bayar Tagihan & PPOB', style: AppTextStyles.h2),
-                  Text('Pembayaran otomatis dengan struk lengkap', style: AppTextStyles.caption),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  ListTile(
-                    leading: const Icon(Icons.bolt_rounded, color: AppColors.gold, size: 32),
-                    title: const Text('Token PLN Listrik 100rb'),
-                    subtitle: const Text('No. Meter: 32189028 • Biaya Admin Rp 1.500'),
-                    trailing: Text(CurrencyFormatter.rupiah(_billAmount), style: AppTextStyles.h3),
-                    tileColor: AppColors.primarySoft,
-                    shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _processBill,
-                      icon: const Icon(Icons.receipt_long_rounded, color: Colors.white),
-                      label: const Text('Bayar Tagihan Sekarang', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: const StadiumBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================== 6. INVESTASI SHEET (85% HEIGHT) ====================
-class _InvestmentSheet extends StatefulWidget {
-  const _InvestmentSheet({this.onSuccess});
-  final VoidCallback? onSuccess;
-
-  @override
-  State<_InvestmentSheet> createState() => _InvestmentSheetState();
-}
-
-class _InvestmentSheetState extends State<_InvestmentSheet> {
-  int _amount = 500000;
-
-  void _processInvestment() {
-    if (_amount > DummyData.cashBalance) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saldo kamu tidak mencukupi!')),
-      );
-      return;
-    }
-
-    DummyData.cashBalance -= _amount;
-    DummyData.investmentBalance += _amount;
-
-    final newTrx = TransactionModel(
-      title: 'Top Up Reksa Dana Pasar Uang',
-      dateTime: 'Hari Ini, ${TimeOfDay.now().format(context)}',
-      channel: 'FinPay Invest',
-      amount: -_amount,
-      icon: Icons.trending_up_rounded,
-      type: TransactionType.saving,
-      referenceNumber: 'FPX-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
-      category: 'Investasi',
-      dateGroup: 'Hari Ini',
-      note: 'Pembelian unit Reksa Dana Pasar Uang',
-    );
-
-    DummyData.transactions.insert(0, newTrx);
-    widget.onSuccess?.call();
-
-    Navigator.pop(context);
-    _showReceiptDialog(
-      context,
-      title: 'Top Up Investasi Berhasil! 📈',
-      amountText: CurrencyFormatter.rupiah(-_amount, withSign: true),
-      amountColor: AppColors.primary,
-      details: [
-        {'label': 'Produk', 'value': 'Reksa Dana Pasar Uang'},
-        {'label': 'Estimasi Imbal Hasil', 'value': '+4.5% / tahun'},
-        {'label': 'Total Portofolio Investasi', 'value': CurrencyFormatter.rupiah(DummyData.investmentBalance)},
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: AppSpacing.md),
-          Center(
-            child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: AppRadius.pillAll)),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.only(
-                left: AppSpacing.xl,
-                right: AppSpacing.xl,
-                bottom: MediaQuery.of(context).padding.bottom + AppSpacing.xl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Top Up Investasi FinPay', style: AppTextStyles.h2),
-                  Text('Reksa Dana Pasar Uang • Imbal Hasil +4.5%/thn', style: AppTextStyles.caption),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    children: [100000, 250000, 500000, 1000000].map((amt) {
-                      return ChoiceChip(
-                        label: Text(CurrencyFormatter.rupiah(amt)),
-                        selected: _amount == amt,
-                        onSelected: (sel) {
-                          if (sel) setState(() => _amount = amt);
-                        },
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: _amount == amt ? Colors.white : AppColors.textPrimary),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _processInvestment,
-                      icon: const Icon(Icons.trending_up_rounded, color: Colors.white),
-                      label: Text('Beli Investasi ${CurrencyFormatter.rupiah(_amount)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: const StadiumBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================== 7. TARIK TUNAI SHEET (85% HEIGHT) ====================
+// ==================== 5. TARIK TUNAI SHEET (85% HEIGHT) ====================
 class _CashoutSheet extends StatefulWidget {
   const _CashoutSheet({this.onSuccess});
   final VoidCallback? onSuccess;
@@ -1246,7 +985,7 @@ class _CashoutSheetState extends State<_CashoutSheet> {
   }
 }
 
-// ==================== 8. QRIS PAY SHEET (85% HEIGHT) ====================
+// ==================== 6. QRIS PAY SHEET (85% HEIGHT) ====================
 class _QrisPaySheet extends StatefulWidget {
   const _QrisPaySheet({this.onSuccess});
   final VoidCallback? onSuccess;

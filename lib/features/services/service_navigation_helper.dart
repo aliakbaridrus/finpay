@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'bills_page.dart';
 import 'cash_flow_page.dart';
-import 'investment_page.dart';
 import 'loan_page.dart';
 import 'promos_page.dart';
 import 'savings_page.dart';
@@ -25,10 +23,6 @@ abstract class ServiceNavigationHelper {
       page = const LoanPage();
     } else if (lower.contains('cash flow') || lower.contains('arus kas')) {
       page = const CashFlowPage();
-    } else if (lower.contains('tagihan') || lower.contains('ppob')) {
-      page = const BillsPage();
-    } else if (lower.contains('investasi')) {
-      page = const InvestmentPage();
     } else if (lower.contains('promo')) {
       page = const PromosPage();
     } else {
