@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../data/dummy/dummy_data.dart';
 import '../../data/models/transaction_model.dart';
+import '../../data/services/transaction_service.dart';
 import 'widgets/history_header.dart';
 import 'widgets/monthly_summary_card.dart';
 import 'widgets/transaction_list_group.dart';
 
-/// Halaman Riwayat Transaksi FinPay.
+/// Halaman Riwayat Transaksi FinPay terintegrasi TransactionService (Bagian Ali).
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
 
@@ -31,24 +31,22 @@ class _HistoryPageState extends State<HistoryPage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    TransactionService.instance.fetchTransactionsFromFirebase();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
   List<TransactionModel> get _filteredTransactions {
-    return DummyData.transactions.where((trx) {
-      final matchesFilter = _selectedFilter.matches(trx);
-      if (!matchesFilter) return false;
-
-      if (_searchQuery.isEmpty) return true;
-
-      final query = _searchQuery.toLowerCase();
-      return trx.title.toLowerCase().contains(query) ||
-          trx.channel.toLowerCase().contains(query) ||
-          trx.category.toLowerCase().contains(query) ||
-          trx.referenceNumber.toLowerCase().contains(query);
-    }).toList();
+    return TransactionService.instance.getTransactions(
+      filter: _selectedFilter,
+      searchQuery: _searchQuery,
+    );
   }
 
   int get _totalIncome {
@@ -96,8 +94,10 @@ class _HistoryPageState extends State<HistoryPage> {
                     ),
                   ),
                   trailing: m == _selectedMonth
-                      ? const Icon(Icons.check_circle_rounded,
-                          color: AppColors.primary)
+                      ? const Icon(
+                          Icons.check_circle_rounded,
+                          color: AppColors.primary,
+                        )
                       : null,
                   onTap: () {
                     setState(() => _selectedMonth = m);
@@ -113,87 +113,93 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredTransactions;
+    return ValueListenableBuilder<List<TransactionModel>>(
+      valueListenable: TransactionService.instance.transactionsNotifier,
+      builder: (context, _, __) {
+        final filtered = _filteredTransactions;
 
-    return SafeArea(
-      bottom: false,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: AppSizes.maxContentWidth,
+        return SafeArea(
+          bottom: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppSizes.maxContentWidth,
+              ),
+              child: CustomScrollView(
+                slivers: [
+                  // Header & Search
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.page,
+                      AppSpacing.md,
+                      AppSpacing.page,
+                      AppSpacing.md,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: HistoryHeader(
+                        searchController: _searchController,
+                        onSearchChanged: (val) =>
+                            setState(() => _searchQuery = val),
+                        onClearSearch: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                        selectedMonth: _selectedMonth,
+                        onSelectMonthTap: _showMonthPicker,
+                      ),
+                    ),
+                  ),
+
+                  // Kartu Ringkasan Bulan Ini
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.page,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: MonthlySummaryCard(
+                        totalIncome: _totalIncome > 0 ? _totalIncome : 5850000,
+                        totalExpense:
+                            _totalExpense > 0 ? _totalExpense : 1828500,
+                        periodLabel: _selectedMonth,
+                      ),
+                    ),
+                  ),
+
+                  // Filter Chips
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.page,
+                      AppSpacing.lg,
+                      AppSpacing.page,
+                      AppSpacing.md,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _FilterChips(
+                        selected: _selectedFilter,
+                        onSelected: (filter) =>
+                            setState(() => _selectedFilter = filter),
+                      ),
+                    ),
+                  ),
+
+                  // Daftar Transaksi Terkelompok
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.page,
+                      0,
+                      AppSpacing.page,
+                      AppSpacing.xxxl,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: TransactionListGroup(transactions: filtered),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          child: CustomScrollView(
-            slivers: [
-              // Header & Search
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.page,
-                  AppSpacing.md,
-                  AppSpacing.page,
-                  AppSpacing.md,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: HistoryHeader(
-                    searchController: _searchController,
-                    onSearchChanged: (val) =>
-                        setState(() => _searchQuery = val),
-                    onClearSearch: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = '');
-                    },
-                    selectedMonth: _selectedMonth,
-                    onSelectMonthTap: _showMonthPicker,
-                  ),
-                ),
-              ),
-
-              // Kartu Ringkasan Bulan Ini
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.page,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: MonthlySummaryCard(
-                    totalIncome: _totalIncome > 0 ? _totalIncome : 5850000,
-                    totalExpense: _totalExpense > 0 ? _totalExpense : 1828500,
-                    periodLabel: _selectedMonth,
-                  ),
-                ),
-              ),
-
-              // Filter Chips
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.page,
-                  AppSpacing.lg,
-                  AppSpacing.page,
-                  AppSpacing.md,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: _FilterChips(
-                    selected: _selectedFilter,
-                    onSelected: (filter) =>
-                        setState(() => _selectedFilter = filter),
-                  ),
-                ),
-              ),
-
-              // Daftar Transaksi Terkelompok
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.page,
-                  0,
-                  AppSpacing.page,
-                  AppSpacing.xxxl,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: TransactionListGroup(transactions: filtered),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

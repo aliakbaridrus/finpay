@@ -4,6 +4,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/dummy/dummy_data.dart';
+import '../../data/models/wallet_model.dart';
+import '../../data/services/transaction_service.dart';
+import '../../data/services/wallet_service.dart';
 import '../services/service_navigation_helper.dart';
 import 'widgets/balance_card.dart';
 import 'widgets/cash_flow_card.dart';
@@ -16,7 +19,7 @@ import 'widgets/saving_goal_card.dart';
 import 'widgets/security_info_card.dart';
 import 'widgets/transaction_history_section.dart';
 
-/// Halaman Beranda FinPay.
+/// Halaman Beranda FinPay terintegrasi WalletService & TransactionService (Bagian Ali).
 class HomePage extends StatefulWidget {
   const HomePage({super.key, this.onNavigateToHistory});
 
@@ -33,41 +36,56 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: AppSizes.maxContentWidth,
-          ),
-          child: CustomScrollView(
-            slivers: [
-              const SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.page,
-                  AppSpacing.sm,
-                  AppSpacing.page,
-                  0,
+    return ValueListenableBuilder<WalletModel>(
+      valueListenable: WalletService.instance.walletNotifier,
+      builder: (context, wallet, _) {
+        return ValueListenableBuilder(
+          valueListenable: TransactionService.instance.transactionsNotifier,
+          builder: (context, transactions, __) {
+            return SafeArea(
+              bottom: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppSizes.maxContentWidth,
+                  ),
+                  child: CustomScrollView(
+                    slivers: [
+                      const SliverPadding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpacing.page,
+                          AppSpacing.sm,
+                          AppSpacing.page,
+                          0,
+                        ),
+                        sliver: SliverToBoxAdapter(child: HomeHeader()),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.page,
+                          AppSpacing.md,
+                          AppSpacing.page,
+                          AppSpacing.xxxl,
+                        ),
+                        sliver: SliverList.list(
+                          children: _buildSections(wallet, transactions),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                sliver: SliverToBoxAdapter(child: HomeHeader()),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.page,
-                  AppSpacing.md,
-                  AppSpacing.page,
-                  AppSpacing.xxxl,
-                ),
-                sliver: SliverList.list(children: _buildSections()),
-              ),
-            ],
-          ),
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
-  List<Widget> _buildSections() {
+  List<Widget> _buildSections(
+    WalletModel wallet,
+    List<dynamic> transactions,
+  ) {
     return [
       GreetingSection(
         userName: DummyData.userName,
@@ -76,9 +94,9 @@ class _HomePageState extends State<HomePage> {
       ),
       const SizedBox(height: AppSpacing.lg),
       BalanceCard(
-        totalBalance: DummyData.totalBalance,
-        cashBalance: DummyData.cashBalance,
-        savingBalance: DummyData.savingBalance,
+        totalBalance: wallet.totalWealth,
+        cashBalance: wallet.cashBalance,
+        savingBalance: wallet.savingBalance,
         phoneNumber: DummyData.phoneNumber,
       ),
       const SizedBox(height: AppSpacing.lg),

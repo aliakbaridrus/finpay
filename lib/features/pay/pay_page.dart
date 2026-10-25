@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../shared/dialogs/financial_action_sheets.dart';
+import '../../core/utils/currency_formatter.dart';
+import '../../data/dummy/dummy_data.dart';
+import '../../data/services/wallet_service.dart';
 import '../../shared/widgets/pill_badge.dart';
 
-/// Halaman Bayar & QRIS Scanner FinPay.
+/// Halaman Bayar QRIS & Tarik Tunai FinPay terintegrasi WalletService (Bagian Ali).
 class PayPage extends StatefulWidget {
   const PayPage({super.key});
 
@@ -16,7 +18,7 @@ class PayPage extends StatefulWidget {
 
 class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
   bool _isFlashOn = false;
-  int _selectedMode = 0; // 0: Scan QRIS, 1: Kode Bayar, 2: Input Manual
+  int _selectedMode = 0; // 0: Scan QRIS, 1: Kode Bayar / Tarik Tunai
   late AnimationController _animationController;
 
   @override
@@ -34,10 +36,113 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  void _onScanSuccess() {
-    FinancialActionSheets.showQrisPay(
-      context,
-      onStateChanged: () => setState(() {}),
+  Future<void> _onProcessAction() async {
+    final timeFormatted = TimeOfDay.now().format(context);
+
+    if (_selectedMode == 0) {
+      // Mode 0: Bayar dengan Scan QRIS via WalletService
+      try {
+        final trx = await WalletService.instance.payWithQris(
+          merchantName: 'Kopi Kenangan Sudirman',
+          amount: 45000,
+          timeFormatted: timeFormatted,
+        );
+        if (!mounted) return;
+        _showSuccessDialog(
+          title: 'Pembayaran QRIS Sukses! 📱',
+          amountText: CurrencyFormatter.rupiah(trx.amount, withSign: true),
+          subtitle:
+              'Merchant: Kopi Kenangan Sudirman\nNo. Ref: ${trx.referenceNumber}\nSisa Saldo Cash: ${CurrencyFormatter.rupiah(DummyData.cashBalance)}',
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } else {
+      // Mode 1: Buat Kode Tarik Tunai ATM via WalletService
+      try {
+        final res = await WalletService.instance.createCashoutCode(
+          amount: 200000,
+          channelName: 'ATM Bersama / Indomaret',
+          timeFormatted: timeFormatted,
+        );
+        if (!mounted) return;
+        _showSuccessDialog(
+          title: 'Kode Tarik Tunai Dibuat! 🏧',
+          amountText: CurrencyFormatter.rupiah(-200000, withSign: true),
+          subtitle:
+              'Kode Penarikan: ${res['tokenCode']}\nNo. Ref: ${res['referenceNumber']}\nSisa Saldo Cash: ${CurrencyFormatter.rupiah(DummyData.cashBalance)}',
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    }
+  }
+
+  void _showSuccessDialog({
+    required String title,
+    required String amountText,
+    required String subtitle,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.xlAll),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: const BoxDecoration(
+                color: AppColors.successLight,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                size: 48,
+                color: AppColors.success,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(title, style: AppTextStyles.h2, textAlign: TextAlign.center),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              amountText,
+              style: AppTextStyles.displayLarge.copyWith(
+                color: AppColors.danger,
+                fontSize: 28,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() {});
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text('Selesai'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -61,32 +166,42 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Bayar dengan QRIS',
+                        'Bayar QRIS & Tarik Tunai',
                         style: AppTextStyles.h2.copyWith(color: Colors.white),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Standar Pembayaran Nasional',
-                        style: AppTextStyles.caption.copyWith(color: Colors.white70),
+                        'Saldo Aktif: ${CurrencyFormatter.rupiah(DummyData.cashBalance)}',
+                        style:
+                            AppTextStyles.caption.copyWith(color: Colors.white70),
                       ),
                     ],
                   ),
                   Row(
                     children: [
                       IconButton(
-                        onPressed: () => setState(() => _isFlashOn = !_isFlashOn),
+                        onPressed: () =>
+                            setState(() => _isFlashOn = !_isFlashOn),
                         icon: Icon(
-                          _isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                          _isFlashOn
+                              ? Icons.flash_on_rounded
+                              : Icons.flash_off_rounded,
                           color: _isFlashOn ? AppColors.gold : Colors.white,
                         ),
                       ),
                       IconButton(
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Membuka Galeri Foto untuk QRIS...')),
+                            const SnackBar(
+                              content:
+                                  Text('Membuka Galeri Foto untuk QRIS...'),
+                            ),
                           );
                         },
-                        icon: const Icon(Icons.image_outlined, color: Colors.white),
+                        icon: const Icon(
+                          Icons.image_outlined,
+                          color: Colors.white,
+                        ),
                       ),
                     ],
                   ),
@@ -117,17 +232,14 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
                               ),
                             ),
                           ),
-
-                          // Corner Borders
                           SizedBox(
                             width: 280,
                             height: 280,
                             child: CustomPaint(
-                              painter: _QRScannerPainter(color: AppColors.primary),
+                              painter:
+                                  _QRScannerPainter(color: AppColors.primary),
                             ),
                           ),
-
-                          // Animated Scan Line
                           if (_selectedMode == 0)
                             AnimatedBuilder(
                               animation: _animationController,
@@ -141,7 +253,8 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
                                       color: AppColors.primary,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: AppColors.primary.withValues(alpha: 0.8),
+                                          color: AppColors.primary
+                                              .withValues(alpha: 0.8),
                                           blurRadius: 10,
                                           spreadRadius: 2,
                                         ),
@@ -151,8 +264,6 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
                                 );
                               },
                             ),
-
-                          // QR Code Center Mockup
                           if (_selectedMode == 1)
                             Container(
                               padding: const EdgeInsets.all(AppSpacing.md),
@@ -171,7 +282,8 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
                                   const SizedBox(height: 4),
                                   Text(
                                     '8819 2819 0192 4819',
-                                    style: AppTextStyles.label.copyWith(letterSpacing: 2),
+                                    style: AppTextStyles.label
+                                        .copyWith(letterSpacing: 2),
                                   ),
                                 ],
                               ),
@@ -180,8 +292,6 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xl),
-
-                    // Instruction Banner
                     const PillBadge(
                       label: 'QRIS Resmi Berizin OJK & BI',
                       leadingIcon: Icons.verified_rounded,
@@ -192,9 +302,10 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
                     Text(
                       _selectedMode == 0
                           ? 'Arahkan kamera ke QRIS merchant untuk membayar'
-                          : 'Tunjukkan kode ini ke kasir merchant FinPay',
+                          : 'Gunakan kode tarik tunai untuk penarikan di ATM / Retail',
                       textAlign: TextAlign.center,
-                      style: AppTextStyles.bodySmall.copyWith(color: Colors.white70),
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: Colors.white70),
                     ),
                   ],
                 ),
@@ -223,8 +334,8 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: _ModeTab(
-                          label: 'Kode Bayar',
-                          icon: Icons.qr_code_2_rounded,
+                          label: 'Tarik Tunai / Kode',
+                          icon: Icons.payments_outlined,
                           isSelected: _selectedMode == 1,
                           onTap: () => setState(() => _selectedMode = 1),
                         ),
@@ -232,16 +343,19 @@ class _PayPageState extends State<PayPage> with SingleTickerProviderStateMixin {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.lg),
-
-                  // Action Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _onScanSuccess,
-                      icon: const Icon(Icons.flash_on_rounded, color: Colors.white),
-                      label: const Text(
-                        'Simulasi Bayar QRIS (Rp 45.000)',
-                        style: TextStyle(
+                      onPressed: _onProcessAction,
+                      icon: const Icon(
+                        Icons.flash_on_rounded,
+                        color: Colors.white,
+                      ),
+                      label: Text(
+                        _selectedMode == 0
+                            ? 'Bayar QRIS Merchant (Rp 45.000)'
+                            : 'Buat Kode Tarik Tunai (Rp 200.000)',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
