@@ -3,19 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../data/dummy/dummy_data.dart';
+import '../../../data/models/support_chat_model.dart';
+import '../../../data/services/support_chat_service.dart';
 import '../../../shared/widgets/pill_badge.dart';
 import '../widgets/sub_page_scaffold.dart';
 
-class _Message {
-  const _Message(this.text, {required this.fromUser, required this.time});
-
-  final String text;
-  final bool fromUser;
-  final String time;
-}
-
-/// Hubungi CS: UI chat dengan balasan otomatis (dummy).
-/// Nanti bisa diganti koneksi ke layanan chat sungguhan.
+/// Hubungi CS: Live Chat Customer Support terintegrasi dua arah dengan FinPay Admin Web Portal.
 class ContactCsPage extends StatefulWidget {
   const ContactCsPage({super.key});
 
@@ -25,25 +19,20 @@ class ContactCsPage extends StatefulWidget {
 
 class _ContactCsPageState extends State<ContactCsPage> {
   static const List<String> _quickReplies = [
-    'Transfer gagal',
-    'Lupa PIN',
-    'Naikkan limit',
-    'Kartu hilang',
+    'Top up belum masuk',
+    'Kendala transfer antar bank',
+    'Lupa PIN transaksi',
+    'Pertanyaan limit harian',
   ];
 
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scroll = ScrollController();
-  final List<_Message> _messages = [];
-  bool _typing = false;
+  final String _userId = 'finpay_user_01';
 
   @override
   void initState() {
     super.initState();
-    _messages.add(_Message(
-      'Halo! Aku Fina, asisten virtual FinPay. Ada yang bisa kubantu hari ini?',
-      fromUser: false,
-      time: _now(),
-    ));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToEnd());
   }
 
   @override
@@ -53,55 +42,19 @@ class _ContactCsPageState extends State<ContactCsPage> {
     super.dispose();
   }
 
-  String _now() {
-    final n = DateTime.now();
-    final h = n.hour.toString().padLeft(2, '0');
-    final m = n.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
-
-  /// Balasan sederhana berdasarkan kata kunci.
-  String _replyFor(String text) {
-    final q = text.toLowerCase();
-    if (q.contains('transfer')) {
-      return 'Untuk transfer yang gagal, saldo biasanya dikembalikan otomatis '
-          'maksimal 1x24 jam. Boleh kirim nominal dan waktu transaksinya?';
-    }
-    if (q.contains('pin')) {
-      return 'Kamu bisa reset PIN lewat Akun > Keamanan > Ubah PIN, atau '
-          'ketuk Lupa PIN saat login untuk verifikasi OTP.';
-    }
-    if (q.contains('limit')) {
-      return 'Limit harian bisa diatur di Akun > Limit Transaksi. Untuk '
-          'limit di atas Rp 50 juta, aku bantu teruskan ke tim verifikasi.';
-    }
-    if (q.contains('kartu') || q.contains('hilang')) {
-      return 'Tenang ya. Segera bekukan kartu di Akun > Rekening & Kartu. '
-          'Setelah itu aku bantu proses penggantian kartunya.';
-    }
-    return 'Terima kasih sudah menghubungi FinPay. Pesanmu sudah kuterima '
-        'dan akan ditindaklanjuti agen CS kami.';
-  }
-
   void _send(String raw) {
     final text = raw.trim();
-    if (text.isEmpty || _typing) return;
+    if (text.isEmpty) return;
 
-    setState(() {
-      _messages.add(_Message(text, fromUser: true, time: _now()));
-      _typing = true;
-    });
+    SupportChatService.instance.sendMessage(
+      userId: _userId,
+      userName: DummyData.userName,
+      text: text,
+      isFromAdmin: false,
+    );
+
     _controller.clear();
     _scrollToEnd();
-
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
-      setState(() {
-        _typing = false;
-        _messages.add(_Message(_replyFor(text), fromUser: false, time: _now()));
-      });
-      _scrollToEnd();
-    });
   }
 
   void _scrollToEnd() {
@@ -118,13 +71,13 @@ class _ContactCsPageState extends State<ContactCsPage> {
   @override
   Widget build(BuildContext context) {
     return SubPageScaffold(
-      title: 'Hubungi CS',
+      title: 'Bantuan & Live CS',
       actions: const [
         Padding(
           padding: EdgeInsets.only(right: AppSpacing.page),
           child: Center(
             child: PillBadge(
-              label: 'Online',
+              label: 'CS Online',
               leadingIcon: Icons.circle,
               backgroundColor: AppColors.successLight,
               foregroundColor: AppColors.success,
@@ -132,43 +85,51 @@ class _ContactCsPageState extends State<ContactCsPage> {
           ),
         ),
       ],
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.page,
-                AppSpacing.sm,
-                AppSpacing.page,
-                AppSpacing.md,
+      body: ValueListenableBuilder<List<SupportMessageModel>>(
+        valueListenable: SupportChatService.instance.messagesNotifier,
+        builder: (context, allMessages, _) {
+          final userMessages = allMessages
+              .where((m) => m.userId == _userId)
+              .toList();
+
+          return Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.page,
+                    AppSpacing.sm,
+                    AppSpacing.page,
+                    AppSpacing.md,
+                  ),
+                  itemCount: userMessages.length,
+                  itemBuilder: (context, index) {
+                    return _Bubble(message: userMessages[index]);
+                  },
+                ),
               ),
-              itemCount: _messages.length + (_typing ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length) return const _TypingBubble();
-                return _Bubble(message: _messages[index]);
-              },
-            ),
-          ),
-          SizedBox(
-            height: 38,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
-              itemCount: _quickReplies.length,
-              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
-              itemBuilder: (_, i) => ActionChip(
-                label: Text(_quickReplies[i]),
-                onPressed: () => _send(_quickReplies[i]),
-                backgroundColor: AppColors.surface,
-                side: const BorderSide(color: AppColors.border),
-                labelStyle:
-                    AppTextStyles.label.copyWith(color: AppColors.primary),
+              SizedBox(
+                height: 38,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
+                  itemCount: _quickReplies.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+                  itemBuilder: (_, i) => ActionChip(
+                    label: Text(_quickReplies[i]),
+                    onPressed: () => _send(_quickReplies[i]),
+                    backgroundColor: AppColors.surface,
+                    side: const BorderSide(color: AppColors.border),
+                    labelStyle:
+                        AppTextStyles.label.copyWith(color: AppColors.primary),
+                  ),
+                ),
               ),
-            ),
-          ),
-          _buildInputBar(),
-        ],
+              _buildInputBar(),
+            ],
+          );
+        },
       ),
     );
   }
@@ -179,45 +140,49 @@ class _ContactCsPageState extends State<ContactCsPage> {
         AppSpacing.page,
         AppSpacing.md,
         AppSpacing.page,
-        AppSpacing.md,
+        AppSpacing.lg,
       ),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _controller,
-              onSubmitted: _send,
               textInputAction: TextInputAction.send,
-              style: AppTextStyles.body,
+              onSubmitted: _send,
               decoration: InputDecoration(
-                hintText: 'Tulis pesan...',
+                hintText: 'Tulis pesan untuk Admin FinPay...',
                 hintStyle:
                     AppTextStyles.body.copyWith(color: AppColors.textTertiary),
-                filled: true,
                 fillColor: AppColors.surface,
+                filled: true,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.lg,
                   vertical: AppSpacing.md,
                 ),
                 border: OutlineInputBorder(
                   borderRadius: AppRadius.pillAll,
-                  borderSide: BorderSide.none,
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.pillAll,
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: AppRadius.pillAll,
+                  borderSide:
+                      const BorderSide(color: AppColors.primary, width: 1.5),
                 ),
               ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
-          Material(
-            color: AppColors.primary,
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () => _send(_controller.text),
-              child: const SizedBox(
-                width: 46,
-                height: 46,
-                child: Icon(Icons.send_rounded, color: Colors.white, size: 20),
-              ),
+          IconButton.filled(
+            onPressed: () => _send(_controller.text),
+            icon: const Icon(Icons.send_rounded, size: AppSizes.iconMd),
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.all(AppSpacing.md),
             ),
           ),
         ],
@@ -229,78 +194,82 @@ class _ContactCsPageState extends State<ContactCsPage> {
 class _Bubble extends StatelessWidget {
   const _Bubble({required this.message});
 
-  final _Message message;
+  final SupportMessageModel message;
 
   @override
   Widget build(BuildContext context) {
-    final user = message.fromUser;
+    final fromUser = !message.isFromAdmin;
 
-    return Align(
-      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: AppSpacing.md),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
-        ),
-        constraints: const BoxConstraints(maxWidth: 300),
-        decoration: BoxDecoration(
-          color: user ? AppColors.primary : AppColors.surface,
-          boxShadow: user ? null : AppShadows.card,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(AppRadius.lg),
-            topRight: const Radius.circular(AppRadius.lg),
-            bottomLeft: Radius.circular(user ? AppRadius.lg : 4),
-            bottomRight: Radius.circular(user ? 4 : AppRadius.lg),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment:
-              user ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.text,
-              style: AppTextStyles.body.copyWith(
-                color: user ? Colors.white : AppColors.textPrimary,
-                height: 1.4,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        mainAxisAlignment:
+            fromUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!fromUser) ...[
+            Container(
+              width: 32,
+              height: 32,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
               ),
+              child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 18),
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              message.time,
-              style: AppTextStyles.caption.copyWith(
-                color: user
-                    ? Colors.white.withValues(alpha: 0.7)
-                    : AppColors.textTertiary,
-                fontSize: 10,
-              ),
-            ),
+            const SizedBox(width: AppSpacing.xs),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TypingBubble extends StatelessWidget {
-  const _TypingBubble();
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: AppSpacing.md),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.lg,
-          vertical: AppSpacing.md,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: AppRadius.lgAll,
-          boxShadow: AppShadows.card,
-        ),
-        child: Text('Fina sedang mengetik...', style: AppTextStyles.caption),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.md,
+              ),
+              decoration: BoxDecoration(
+                color: fromUser ? AppColors.primary : AppColors.surface,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(AppRadius.lg),
+                  topRight: const Radius.circular(AppRadius.lg),
+                  bottomLeft: Radius.circular(fromUser ? AppRadius.lg : 0),
+                  bottomRight: Radius.circular(fromUser ? 0 : AppRadius.lg),
+                ),
+                border: fromUser ? null : Border.all(color: AppColors.border),
+                boxShadow: AppShadows.card,
+              ),
+              child: Column(
+                crossAxisAlignment:
+                    fromUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  if (!fromUser)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                        'Admin FinPay',
+                        style: AppTextStyles.labelSmall.copyWith(color: AppColors.primary),
+                      ),
+                    ),
+                  Text(
+                    message.text,
+                    style: AppTextStyles.body.copyWith(
+                      color: fromUser ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    message.timeFormatted,
+                    style: AppTextStyles.caption.copyWith(
+                      color: fromUser
+                          ? Colors.white.withValues(alpha: 0.7)
+                          : AppColors.textTertiary,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (fromUser) const SizedBox(width: AppSpacing.xs),
+        ],
       ),
     );
   }
