@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -23,7 +22,7 @@ class FinPayApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: kIsWeb ? 'FinPay Admin Portal' : 'FinPay',
+      title: 'FinPay',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       // Batasi skala teks sistem agar layout tetap rapi di semua perangkat.
@@ -39,8 +38,12 @@ class FinPayApp extends StatelessWidget {
           child: child!,
         );
       },
-      // Khusus Web adalah Admin Portal, sedangkan di APK / HP murni aplikasi pengguna (MainPage).
-      home: kIsWeb ? const AdminDashboardPage() : const MainPage(),
+      // Secara default (baik di HP maupun saat flutter run -d chrome), selalu membuka aplikasi FinPay.
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const MainPage(),
+        '/admin': (context) => const AdminDashboardPage(),
+      },
     );
   }
 }
