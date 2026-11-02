@@ -6,10 +6,8 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/dummy/dummy_data.dart';
 import '../../data/models/support_chat_model.dart';
-import '../../data/models/transaction_model.dart';
 import '../../data/models/wallet_model.dart';
 import '../../data/services/support_chat_service.dart';
-import '../../data/services/transaction_service.dart';
 import '../../data/services/wallet_service.dart';
 import '../../shared/widgets/pill_badge.dart';
 
@@ -824,7 +822,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
-                border: const Border(bottom: BorderSide(color: AppColors.border)),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: AppColors.border)),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
