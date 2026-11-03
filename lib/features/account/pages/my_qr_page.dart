@@ -4,26 +4,78 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../../../data/dummy/dummy_data.dart';
+import '../../../data/models/qris_model.dart';
+import '../../../data/services/qris_service.dart';
+import '../../../shared/widgets/qris_code_card.dart';
 import '../widgets/sub_page_scaffold.dart';
 
-/// QR Saya: kartu untuk menerima pembayaran.
-/// QR di sini hanya ilustrasi (pola dummy), bukan kode yang bisa dipindai.
-class MyQrPage extends StatelessWidget {
+/// QRIS Saya: kartu QRIS asli untuk menerima pembayaran dari aplikasi bank /
+/// e-wallet lain. Mendukung QRIS statis (tanpa nominal) dan dinamis (nominal terkunci).
+class MyQrPage extends StatefulWidget {
   const MyQrPage({super.key});
 
-  void _copyNumber(BuildContext context) {
-    // Kode yang benar:
-    Clipboard.setData(ClipboardData(text: DummyData.phoneNumber));
+  @override
+  State<MyQrPage> createState() => _MyQrPageState();
+}
+
+class _MyQrPageState extends State<MyQrPage> {
+  final TextEditingController _amountController = TextEditingController();
+  bool _isDynamic = false;
+  int? _lockedAmount;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  QrisPayload get _payload =>
+      QrisService.instance.myQris(amount: _isDynamic ? _lockedAmount : null);
+
+  void _setMode(bool dynamicMode) {
+    setState(() {
+      _isDynamic = dynamicMode;
+      if (!dynamicMode) {
+        _lockedAmount = null;
+        _amountController.clear();
+      }
+    });
+  }
+
+  void _applyAmount() {
+    final amount = int.tryParse(
+      _amountController.text.replaceAll('.', '').replaceAll('Rp', '').trim(),
+    );
+    try {
+      if (amount == null) {
+        throw const QrisFormatException('Masukkan nominal yang valid.');
+      }
+      QrisService.instance.validateAmount(amount);
+      FocusScope.of(context).unfocus();
+      setState(() => _lockedAmount = amount);
+    } on QrisFormatException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
+  }
+
+  void _copyQris() {
+    Clipboard.setData(ClipboardData(text: _payload.encode()));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Nomor FinPay disalin')),
+      const SnackBar(content: Text('Kode QRIS disalin')),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final payload = _payload;
+    final needsAmount = _isDynamic && _lockedAmount == null;
+
     return SubPageScaffold(
-      title: 'QR Saya',
+      title: 'QRIS Saya',
       children: [
         DecoratedBox(
           decoration: BoxDecoration(
@@ -36,7 +88,7 @@ class MyQrPage extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  'Scan untuk membayar ke',
+                  'Terima pembayaran ke',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: Colors.white.withValues(alpha: 0.8),
                   ),
@@ -47,30 +99,43 @@ class MyQrPage extends StatelessWidget {
                   style: AppTextStyles.h1.copyWith(color: Colors.white),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: AppRadius.lgAll,
+                if (needsAmount)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.xxl),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: AppRadius.xlAll,
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.lock_outline_rounded,
+                          size: 48,
+                          color: AppColors.textTertiary,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'Atur nominal untuk membuat QRIS dinamis',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.bodySmall,
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  QrisCodeCard(
+                    data: payload.encode(),
+                    merchantName: payload.merchantName,
+                    nmid: payload.nmid,
+                    amount: payload.amount,
                   ),
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: CustomPaint(painter: _FakeQrPainter()),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   DummyData.phoneNumber,
                   style: AppTextStyles.bodyLarge.copyWith(
                     color: Colors.white,
                     letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Contoh tampilan, bukan QR asli',
-                  style: AppTextStyles.caption.copyWith(
-                    color: Colors.white.withValues(alpha: 0.65),
                   ),
                 ),
               ],
@@ -81,11 +146,68 @@ class MyQrPage extends StatelessWidget {
         Row(
           children: [
             Expanded(
+              child: _ModeChip(
+                label: 'QRIS Statis',
+                icon: Icons.qr_code_2_rounded,
+                selected: !_isDynamic,
+                onTap: () => _setMode(false),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _ModeChip(
+                label: 'QRIS Dinamis',
+                icon: Icons.lock_clock_rounded,
+                selected: _isDynamic,
+                onTap: () => _setMode(true),
+              ),
+            ),
+          ],
+        ),
+        if (_isDynamic) ...[
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Nominal tagihan (Rp)',
+                    prefixIcon: const Icon(Icons.payments_rounded),
+                    helperText: _lockedAmount == null
+                        ? 'Min Rp 1.000 • Maks Rp 10.000.000'
+                        : 'Terkunci: ${CurrencyFormatter.rupiah(_lockedAmount!)}',
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    border: OutlineInputBorder(borderRadius: AppRadius.mdAll),
+                  ),
+                  onSubmitted: (_) => _applyAmount(),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              ElevatedButton(
+                onPressed: _applyAmount,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(88, 56),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
+                ),
+                child: const Text('Terapkan'),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: AppSpacing.lg),
+        Row(
+          children: [
+            Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _copyNumber(context),
+                onPressed: needsAmount ? null : _copyQris,
                 icon: const Icon(Icons.copy_rounded, size: AppSizes.iconMd),
                 label: Text(
-                  'Salin Nomor',
+                  'Salin Kode QRIS',
                   style:
                       AppTextStyles.bodyLarge.copyWith(color: AppColors.primary),
                 ),
@@ -100,9 +222,13 @@ class MyQrPage extends StatelessWidget {
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Bagikan belum tersedia (demo)')),
-                ),
+                onPressed: needsAmount
+                    ? null
+                    : () => ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Bagikan belum tersedia (demo)'),
+                          ),
+                        ),
                 icon: const Icon(Icons.ios_share_rounded, size: AppSizes.iconMd),
                 label: Text(
                   'Bagikan',
@@ -124,47 +250,52 @@ class MyQrPage extends StatelessWidget {
   }
 }
 
-/// Menggambar pola mirip QR (3 kotak sudut + isi pseudo-acak yang tetap).
-class _FakeQrPainter extends CustomPainter {
-  static const int _cells = 25;
+class _ModeChip extends StatelessWidget {
+  const _ModeChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
 
-  bool _inFinder(int x, int y) {
-    final inX = x < 7 || x >= _cells - 7;
-    final inY = y < 7 || y >= _cells - 7;
-    // Tiga sudut: kiri-atas, kanan-atas, kiri-bawah (kanan-bawah kosong).
-    return inX && inY && !(x >= _cells - 7 && y >= _cells - 7);
-  }
-
-  bool _finderFilled(int x, int y) {
-    final lx = x < 7 ? x : x - (_cells - 7);
-    final ly = y < 7 ? y : y - (_cells - 7);
-    final ring = lx == 0 || lx == 6 || ly == 0 || ly == 6;
-    final core = lx >= 2 && lx <= 4 && ly >= 2 && ly <= 4;
-    return ring || core;
-  }
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final cell = size.width / _cells;
-    final paint = Paint()..color = AppColors.textPrimary;
-
-    for (var y = 0; y < _cells; y++) {
-      for (var x = 0; x < _cells; x++) {
-        final filled = _inFinder(x, y)
-            ? _finderFilled(x, y)
-            : (x * 7 + y * 13 + x * y) % 3 == 0;
-        if (!filled) continue;
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(x * cell, y * cell, cell, cell),
-            Radius.circular(cell * 0.2),
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.surface,
+          borderRadius: AppRadius.pillAll,
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
           ),
-          paint,
-        );
-      }
-    }
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: AppSizes.iconMd,
+              color: selected ? Colors.white : AppColors.textSecondary,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text(
+              label,
+              style: AppTextStyles.label.copyWith(
+                color: selected ? Colors.white : AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
