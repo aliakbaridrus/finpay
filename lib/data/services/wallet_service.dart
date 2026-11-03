@@ -151,31 +151,45 @@ class WalletService {
   }
 
   /// Proses Pembayaran Scan QRIS Merchant.
+  ///
+  /// [nmid] & [merchantCity] opsional agar pemanggil lama tetap kompatibel.
   Future<TransactionModel> payWithQris({
     required String merchantName,
     required int amount,
     required String timeFormatted,
+    String? nmid,
+    String? merchantCity,
+    int adminFee = 0,
   }) async {
-    if (amount > DummyData.cashBalance) {
+    if (amount <= 0) {
+      throw Exception('Nominal pembayaran QRIS harus lebih dari Rp 0.');
+    }
+    final total = amount + adminFee;
+    if (total > DummyData.cashBalance) {
       throw Exception('Saldo FinPay Cash kamu tidak mencukupi!');
     }
 
-    await updateBalance(cashDelta: -amount);
+    await updateBalance(cashDelta: -total);
 
     final referenceNumber =
-        'FPX-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+        'FPX-QR${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    final location = (merchantCity == null || merchantCity.isEmpty)
+        ? ''
+        : ' ($merchantCity)';
+    final nmidNote = (nmid == null || nmid.isEmpty) ? '' : ' • NMID $nmid';
     final trx = TransactionModel(
       userId: FirebaseFirestoreConfig.defaultUserId,
       title: 'Belanja QRIS $merchantName',
       dateTime: 'Hari Ini, $timeFormatted',
       channel: 'QRIS Pay',
-      amount: -amount,
+      amount: -total,
       icon: Icons.qr_code_scanner_rounded,
       type: TransactionType.expense,
       referenceNumber: referenceNumber,
-      category: 'Pembayaran Merchant',
+      category: 'Pembayaran QRIS',
+      adminFee: adminFee,
       dateGroup: 'Hari Ini',
-      note: 'Pembayaran QRIS di $merchantName',
+      note: 'Pembayaran QRIS di $merchantName$location$nmidNote',
     );
 
     await TransactionService.instance.addTransaction(trx);
