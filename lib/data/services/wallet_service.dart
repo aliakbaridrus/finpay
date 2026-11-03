@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../dummy/dummy_data.dart';
+import '../models/qris_model.dart';
 import '../models/transaction_model.dart';
 import '../models/wallet_model.dart';
 import 'midtrans_service.dart';
+import 'qris_service.dart';
 import 'transaction_service.dart';
 
 /// Service Backend Dompet & Pembayaran (Bagian Tugas Ali).
@@ -151,31 +153,148 @@ class WalletService {
   }
 
   /// Proses Pembayaran Scan QRIS Merchant.
+  ///
+  /// [nmid] & [merchantCity] opsional agar pemanggil lama tetap kompatibel.
   Future<TransactionModel> payWithQris({
     required String merchantName,
     required int amount,
     required String timeFormatted,
+    String? nmid,
+    String? merchantCity,
+    int adminFee = 0,
   }) async {
-    if (amount > DummyData.cashBalance) {
+    if (amount <= 0) {
+      throw Exception('Nominal pembayaran QRIS harus lebih dari Rp 0.');
+    }
+    final total = amount + adminFee;
+    if (total > DummyData.cashBalance) {
       throw Exception('Saldo FinPay Cash kamu tidak mencukupi!');
     }
 
-    await updateBalance(cashDelta: -amount);
+    await updateBalance(cashDelta: -total);
 
     final referenceNumber =
-        'FPX-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+        'FPX-QR${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    final location = (merchantCity == null || merchantCity.isEmpty)
+        ? ''
+        : ' ($merchantCity)';
+    final nmidNote = (nmid == null || nmid.isEmpty) ? '' : ' • NMID $nmid';
     final trx = TransactionModel(
       userId: FirebaseFirestoreConfig.defaultUserId,
       title: 'Belanja QRIS $merchantName',
       dateTime: 'Hari Ini, $timeFormatted',
       channel: 'QRIS Pay',
-      amount: -amount,
+      amount: -total,
       icon: Icons.qr_code_scanner_rounded,
       type: TransactionType.expense,
       referenceNumber: referenceNumber,
-      category: 'Pembayaran Merchant',
+      category: 'Pembayaran QRIS',
+      adminFee: adminFee,
       dateGroup: 'Hari Ini',
-      note: 'Pembayaran QRIS di $merchantName',
+      note: 'Pembayaran QRIS di $merchantName$location$nmidNote',
+    );
+
+    await TransactionService.instance.addTransaction(trx);
+    return trx;
+  }
+
+  /// Menerima uang masuk dari pembayaran ke QRIS milik pengguna.
+  Future<TransactionModel> receiveQris({
+    required String payerName,
+    required int amount,
+    required String timeFormatted,
+    String? payerApp,
+  }) async {
+    QrisService.instance.validateAmount(amount);
+
+    await updateBalance(cashDelta: amount);
+
+    final referenceNumber =
+        'FPX-QR${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    final trx = TransactionModel(
+      userId: FirebaseFirestoreConfig.defaultUserId,
+      title: 'Terima QRIS dari $payerName',
+      dateTime: 'Hari Ini, $timeFormatted',
+      channel: 'QRIS Terima',
+      amount: amount,
+      icon: Icons.qr_code_2_rounded,
+      type: TransactionType.income,
+      referenceNumber: referenceNumber,
+      category: 'Terima QRIS',
+      dateGroup: 'Hari Ini',
+      note: payerApp == null
+          ? 'Pembayaran masuk via QRIS FinPay'
+          : 'Pembayaran masuk via QRIS FinPay dari $payerApp',
+    );
+
+    await TransactionService.instance.addTransaction(trx);
+    return trx;
+  }
+
+  final Set<String> _creditedQrisOrders = <String>{};
+
+  /// Langkah 1 Top Up QRIS: buat tagihan di Midtrans Sandbox dan
+  /// kembalikan QRIS dinamis (nominal terkunci) untuk dibayar dari aplikasi bank lain.
+  Future<({MidtransOrderResult order, String qrisString})> createQrisTopUp({
+    required int amount,
+  }) async {
+    QrisService.instance.validateAmount(amount);
+
+    final order = await MidtransService.instance.createSnapTransaction(
+      userId: FirebaseFirestoreConfig.defaultUserId,
+      customerName: DummyData.userName,
+      customerPhone: DummyData.phoneNumber,
+      amount: amount,
+      paymentMethod: 'QRIS',
+    );
+    await _saveMidtransOrderToFirestore(order);
+
+    final payload = QrisPayload(
+      merchantName: 'FinPay Top Up ${DummyData.userName}',
+      merchantCity: 'Jakarta',
+      nmid: QrisService.instance.myNmid,
+      merchantCategoryCode: '6012',
+      amount: amount,
+      referenceLabel: order.orderId,
+      terminalLabel: 'TOPUPQRIS',
+    );
+
+    return (order: order, qrisString: payload.encode());
+  }
+
+  /// Langkah 2 Top Up QRIS: cek status di Midtrans, lalu kredit saldo sekali saja.
+  Future<TransactionModel> confirmQrisTopUp({
+    required MidtransOrderResult order,
+    required String timeFormatted,
+  }) async {
+    if (_creditedQrisOrders.contains(order.orderId)) {
+      throw Exception('Top up ${order.orderId} sudah pernah dikreditkan.');
+    }
+
+    final status = await MidtransService.instance.checkPaymentStatus(
+      order.orderId,
+    );
+    if (status != 'settlement' && status != 'capture') {
+      throw Exception(
+        'Pembayaran QRIS belum diterima (status: ${status.toUpperCase()}).',
+      );
+    }
+
+    _creditedQrisOrders.add(order.orderId);
+    await updateBalance(cashDelta: order.amount);
+
+    final trx = TransactionModel(
+      userId: FirebaseFirestoreConfig.defaultUserId,
+      title: 'Isi Saldo via QRIS',
+      dateTime: 'Hari Ini, $timeFormatted',
+      channel: 'QRIS',
+      amount: order.amount,
+      icon: Icons.add_circle_outline_rounded,
+      type: TransactionType.income,
+      referenceNumber: order.orderId,
+      category: 'Isi Saldo',
+      dateGroup: 'Hari Ini',
+      note: 'Top Up QRIS Midtrans Sandbox (${order.snapToken})',
     );
 
     await TransactionService.instance.addTransaction(trx);

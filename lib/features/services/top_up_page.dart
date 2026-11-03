@@ -5,9 +5,12 @@ import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/dummy/dummy_data.dart';
+import '../../data/services/midtrans_service.dart';
+import '../../data/services/qris_service.dart';
 import '../../data/services/wallet_service.dart';
 import '../../shared/widgets/app_card.dart';
 import '../../shared/widgets/pill_badge.dart';
+import '../../shared/widgets/qris_code_card.dart';
 
 /// Halaman Penuh 1: Isi Saldo FinPay terintegrasi Midtrans Sandbox & WalletService (Bagian Ali).
 class TopUpPage extends StatefulWidget {
@@ -22,11 +25,19 @@ class _TopUpPageState extends State<TopUpPage> {
   bool _isProcessing = false;
   final TextEditingController _customAmountController =
       TextEditingController(text: '100000');
-  String _expandedMethod = 'BCA Virtual Account';
+  String _expandedMethod = 'QRIS (Semua Bank & E-Wallet)';
 
   final List<int> _presetAmounts = [50000, 100000, 200000, 500000, 1000000];
 
   final List<Map<String, String>> _vaMethods = const [
+    {
+      'name': 'QRIS (Semua Bank & E-Wallet)',
+      'code': 'QRIS-MIDTRANS-DYNAMIC',
+      'bank': 'QRIS',
+      'fee': 'Bebas Biaya • Instan 24 Jam via Midtrans QRIS',
+      'steps':
+          '1. Klik tombol Konfirmasi Top Up di bawah untuk membuat barcode QRIS\n2. Scan barcode QRIS dari m-BCA, Livin, BRImo, GoPay, OVO, atau DANA\n3. Konfirmasi pembayaran dan saldo FinPay otomatis masuk.'
+    },
     {
       'name': 'BCA Virtual Account',
       'code': '88012 0812 3456 7890',
@@ -83,6 +94,20 @@ class _TopUpPageState extends State<TopUpPage> {
     setState(() => _isProcessing = true);
 
     try {
+      if (_expandedMethod.toLowerCase().contains('qris')) {
+        final created = await WalletService.instance.createQrisTopUp(
+          amount: amount,
+        );
+        if (!mounted) return;
+        setState(() => _isProcessing = false);
+        await _showQrisTopUpSheet(
+          order: created.order,
+          qrisString: created.qrisString,
+          timeFormatted: timeFormatted,
+        );
+        return;
+      }
+
       final order = await WalletService.instance.topUpWithMidtrans(
         amount: amount,
         paymentMethod: _expandedMethod,
@@ -184,6 +209,108 @@ class _TopUpPageState extends State<TopUpPage> {
       setState(() => _isProcessing = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal memproses Top Up: $e')),
+      );
+    }
+  }
+
+  Future<void> _showQrisTopUpSheet({
+    required MidtransOrderResult order,
+    required String qrisString,
+    required String timeFormatted,
+  }) async {
+    final settled = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: AppRadius.pillAll,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text('Scan QRIS untuk Isi Saldo', style: AppTextStyles.h2),
+                const SizedBox(height: 4),
+                Text(
+                  'Order Midtrans: ${order.orderId}',
+                  style: AppTextStyles.caption,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                QrisCodeCard(
+                  data: qrisString,
+                  merchantName: 'FinPay Top Up ${DummyData.userName}',
+                  nmid: QrisService.instance.myNmid,
+                  amount: order.amount,
+                  size: 190,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => Navigator.pop(sheetCtx, true),
+                    icon: const Icon(
+                      Icons.verified_rounded,
+                      color: Colors.white,
+                    ),
+                    label: Text(
+                      'Simulasikan Sudah Bayar (${CurrencyFormatter.rupiah(order.amount)})',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: const StadiumBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                TextButton(
+                  onPressed: () => Navigator.pop(sheetCtx, false),
+                  child: const Text('Batal'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (settled != true || !mounted) return;
+    try {
+      await WalletService.instance.confirmQrisTopUp(
+        order: order,
+        timeFormatted: timeFormatted,
+      );
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Top Up QRIS ${CurrencyFormatter.rupiah(order.amount)} berhasil masuk ke saldo FinPay Cash!',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
     }
   }

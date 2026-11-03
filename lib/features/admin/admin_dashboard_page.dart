@@ -536,7 +536,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               const SizedBox(width: 16),
               DropdownButton<String>(
                 value: _trxFilter,
-                items: ['Semua', 'Isi Saldo', 'Transfer', 'Pembayaran Merchant', 'Tarik Tunai', 'Pinjaman', 'Tabungan']
+                items: [
+                  'Semua',
+                  'Pembayaran QRIS',
+                  'Terima QRIS',
+                  'Isi Saldo',
+                  'Transfer',
+                  'Pembayaran Merchant',
+                  'Tarik Tunai',
+                  'Pinjaman',
+                  'Tabungan',
+                ]
                     .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
                 onChanged: (v) {
@@ -565,7 +575,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     var list = DummyData.transactions;
 
     if (filterCategory != null && filterCategory.isNotEmpty) {
-      list = list.where((t) => t.category.toLowerCase() == filterCategory.toLowerCase()).toList();
+      final fc = filterCategory.toLowerCase();
+      list = list
+          .where(
+            (t) =>
+                t.category.toLowerCase() == fc ||
+                (fc.contains('qris') && t.channel.toLowerCase().contains('qris')),
+          )
+          .toList();
     }
 
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {

@@ -67,7 +67,13 @@ class _MainPageState extends State<MainPage> {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: List.generate(_navItems.length, _buildPage),
+        children: List.generate(
+          _navItems.length,
+          (index) => TickerMode(
+            enabled: index == _currentIndex,
+            child: _buildPage(index),
+          ),
+        ),
       ),
       bottomNavigationBar: FinPayBottomNavBar(
         items: _navItems,
