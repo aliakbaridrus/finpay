@@ -8,6 +8,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../data/dummy/dummy_data.dart';
 import '../../../data/models/qris_model.dart';
 import '../../../data/services/qris_service.dart';
+import '../../../data/services/wallet_service.dart';
 import '../../../shared/widgets/qris_code_card.dart';
 import '../widgets/sub_page_scaffold.dart';
 
@@ -67,6 +68,51 @@ class _MyQrPageState extends State<MyQrPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Kode QRIS disalin')),
     );
+  }
+
+  static const List<({String name, String app})> _payers = [
+    (name: 'Andi Saputra', app: 'GoPay'),
+    (name: 'Sari Wulandari', app: 'OVO'),
+    (name: 'Budi Hartono', app: 'DANA'),
+    (name: 'Rina Kusuma', app: 'm-BCA'),
+  ];
+  int _incomingCount = 0;
+  bool _isReceiving = false;
+
+  /// Simulasi pembayar dari aplikasi lain memindai QRIS ini.
+  Future<void> _simulateIncomingPayment() async {
+    if (_isReceiving) return;
+    final payer = _payers[_incomingCount % _payers.length];
+    // QRIS dinamis memakai nominal terkunci; QRIS statis dibayar Rp 25.000.
+    final amount = _payload.isDynamic ? _payload.amount! : 25000;
+    final timeFormatted = TimeOfDay.now().format(context);
+
+    setState(() => _isReceiving = true);
+    try {
+      final trx = await WalletService.instance.receiveQris(
+        payerName: payer.name,
+        payerApp: payer.app,
+        amount: amount,
+        timeFormatted: timeFormatted,
+      );
+      if (!mounted) return;
+      _incomingCount++;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${payer.name} (${payer.app}) membayar '
+            '${CurrencyFormatter.rupiah(trx.amount)} • Ref ${trx.referenceNumber}',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _isReceiving = false);
+    }
   }
 
   @override
@@ -244,6 +290,17 @@ class _MyQrPageState extends State<MyQrPage> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextButton.icon(
+          onPressed: (needsAmount || _isReceiving) ? null : _simulateIncomingPayment,
+          icon: const Icon(Icons.download_done_rounded),
+          label: Text(
+            _isReceiving
+                ? 'Memproses pembayaran masuk...'
+                : 'Simulasikan Pembayaran Masuk',
+          ),
+          style: TextButton.styleFrom(foregroundColor: AppColors.success),
         ),
       ],
     );
