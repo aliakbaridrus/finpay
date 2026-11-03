@@ -6,6 +6,11 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/dummy/dummy_data.dart';
 import '../../data/models/transaction_model.dart';
+import '../../data/services/qris_service.dart';
+import '../../data/services/wallet_service.dart';
+import '../../features/pay/widgets/qris_confirm_sheet.dart';
+import '../../features/pay/widgets/qris_merchant_picker_sheet.dart';
+import '../../features/pay/widgets/qris_receipt_sheet.dart';
 import '../widgets/pill_badge.dart';
 
 /// Helper terpusat untuk memproses semua transaksi & aksi Keuangan
@@ -81,13 +86,42 @@ abstract class FinancialActionSheets {
     );
   }
 
-  static void showQrisPay(BuildContext context, {VoidCallback? onStateChanged}) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _QrisPaySheet(onSuccess: onStateChanged),
-    );
+  static Future<void> showQrisPay(
+    BuildContext context, {
+    VoidCallback? onStateChanged,
+  }) async {
+    final merchant = await showQrisMerchantPicker(context);
+    if (merchant == null || !context.mounted) return;
+
+    final payload = QrisService.instance.scan(merchant.qrisString);
+    final approvedAmount = await showQrisConfirmSheet(context, payload);
+    if (approvedAmount == null || !context.mounted) return;
+
+    final timeFormatted = TimeOfDay.now().format(context);
+    try {
+      final fee = QrisService.instance.adminFee(approvedAmount);
+      final trx = await WalletService.instance.payWithQris(
+        merchantName: payload.merchantName,
+        merchantCity: payload.merchantCity,
+        nmid: payload.nmid,
+        amount: approvedAmount,
+        adminFee: fee,
+        timeFormatted: timeFormatted,
+      );
+      onStateChanged?.call();
+      if (!context.mounted) return;
+      await showQrisReceipt(
+        context,
+        transaction: trx,
+        payload: payload,
+      );
+      onStateChanged?.call();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
   }
 
   static void showCashFlowDetail(BuildContext context) {
@@ -968,110 +1002,6 @@ class _CashoutSheetState extends State<_CashoutSheet> {
                       onPressed: _processCashout,
                       icon: const Icon(Icons.payments_outlined, color: Colors.white),
                       label: Text('Buat Kode Tarik ${CurrencyFormatter.rupiah(_amount)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: const StadiumBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================== 6. QRIS PAY SHEET (85% HEIGHT) ====================
-class _QrisPaySheet extends StatefulWidget {
-  const _QrisPaySheet({this.onSuccess});
-  final VoidCallback? onSuccess;
-
-  @override
-  State<_QrisPaySheet> createState() => _QrisPaySheetState();
-}
-
-class _QrisPaySheetState extends State<_QrisPaySheet> {
-  final int _amount = 45000;
-
-  void _processQris() {
-    if (_amount > DummyData.cashBalance) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saldo kamu tidak mencukupi!')),
-      );
-      return;
-    }
-
-    DummyData.cashBalance -= _amount;
-
-    final newTrx = TransactionModel(
-      title: 'Pembayaran QRIS Merchant Coffee',
-      dateTime: 'Hari Ini, ${TimeOfDay.now().format(context)}',
-      channel: 'QRIS Pay',
-      amount: -_amount,
-      icon: Icons.qr_code_scanner_rounded,
-      type: TransactionType.expense,
-      referenceNumber: 'FPX-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
-      category: 'Pembayaran QRIS',
-      dateGroup: 'Hari Ini',
-    );
-
-    DummyData.transactions.insert(0, newTrx);
-    widget.onSuccess?.call();
-
-    Navigator.pop(context);
-    _showReceiptDialog(
-      context,
-      title: 'Pembayaran QRIS Sukses! 📱',
-      amountText: CurrencyFormatter.rupiah(-_amount, withSign: true),
-      amountColor: AppColors.danger,
-      details: [
-        {'label': 'Merchant Name', 'value': 'Kopi Kenangan (Sudirman)'},
-        {'label': 'Metode Pembayaran', 'value': 'QRIS FinPay Cash'},
-        {'label': 'Sisa Saldo Cash', 'value': CurrencyFormatter.rupiah(DummyData.cashBalance)},
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: AppSpacing.md),
-          Center(
-            child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: AppRadius.pillAll)),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.only(
-                left: AppSpacing.xl,
-                right: AppSpacing.xl,
-                bottom: MediaQuery.of(context).padding.bottom + AppSpacing.xl,
-              ),
-              child: Column(
-                children: [
-                  const Icon(Icons.qr_code_scanner_rounded, size: 64, color: AppColors.primary),
-                  const SizedBox(height: AppSpacing.md),
-                  Text('Simulasi Pembayaran QRIS', style: AppTextStyles.h2),
-                  Text('Merchant: Kopi Kenangan • Rp 45.000', style: AppTextStyles.body),
-                  const SizedBox(height: AppSpacing.xl),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _processQris,
-                      icon: const Icon(Icons.check_circle_rounded, color: Colors.white),
-                      label: const Text('Bayar Sekarang Rp 45.000', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 14),
