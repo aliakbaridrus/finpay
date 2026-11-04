@@ -339,6 +339,42 @@ class WalletService {
     };
   }
 
+  /// Proses Setor Tabungan Impian: memindahkan dana dari Saldo Cash ke Saldo Tabungan
+  /// dan mencatat mutasi ke koleksi `transactions` & `wallets` di Firestore.
+  Future<TransactionModel> depositToSaving({
+    required int amount,
+    required String goalTitle,
+    required String timeFormatted,
+  }) async {
+    if (amount <= 0) {
+      throw Exception('Nominal setoran tabungan harus lebih dari Rp 0.');
+    }
+    if (amount > DummyData.cashBalance) {
+      throw Exception('Saldo FinPay Cash kamu tidak mencukupi!');
+    }
+
+    await updateBalance(cashDelta: -amount, savingDelta: amount);
+
+    final referenceNumber =
+        'FPX-SV${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+    final trx = TransactionModel(
+      userId: FirebaseFirestoreConfig.defaultUserId,
+      title: 'Setor Tabungan: $goalTitle',
+      dateTime: 'Hari Ini, $timeFormatted',
+      channel: 'Tabungan FinPay',
+      amount: -amount,
+      icon: Icons.savings_outlined,
+      type: TransactionType.saving,
+      referenceNumber: referenceNumber,
+      category: 'Tabungan',
+      dateGroup: 'Hari Ini',
+      note: 'Alokasi tabungan impian ($goalTitle)',
+    );
+
+    await TransactionService.instance.addTransaction(trx);
+    return trx;
+  }
+
   Future<void> _syncWalletToFirestore(WalletModel wallet) async {
     if (!FirebaseFirestoreConfig.isConfigured) return;
 
