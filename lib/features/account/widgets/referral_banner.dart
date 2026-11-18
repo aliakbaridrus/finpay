@@ -13,10 +13,12 @@ class ReferralBanner extends StatelessWidget {
     super.key,
     required this.code,
     required this.bonusPoints,
+    this.onRedeemTap,
   });
 
   final String code;
   final int bonusPoints;
+  final VoidCallback? onRedeemTap;
 
   static final Color _mutedWhite = Colors.white.withValues(alpha: 0.7);
 
@@ -67,7 +69,7 @@ class ReferralBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      'Bonus untukmu dan temanmu setelah transaksi pertama.',
+                      'Bagikan kode referralmu ke teman saat mereka mendaftar akun baru. Kamu dan temanmu otomatis dapat +$bonusPoints FinPoin!',
                       style: AppTextStyles.bodySmall.copyWith(color: _mutedWhite),
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -78,6 +80,36 @@ class ReferralBanner extends StatelessWidget {
                         _buildCopyButton(context),
                       ],
                     ),
+                    if (onRedeemTap != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: onRedeemTap,
+                          icon: const Icon(
+                            Icons.currency_exchange_rounded,
+                            size: 16,
+                            color: AppColors.mint,
+                          ),
+                          label: Text(
+                            'Tukar FinPoin ke Saldo Cash (1 Poin = Rp 100)',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.25),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppRadius.mdAll,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

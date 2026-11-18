@@ -4,9 +4,13 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/dummy/dummy_data.dart';
+import '../../data/models/user_profile_model.dart';
 import '../../data/models/wallet_model.dart';
+import '../../data/services/account_service.dart';
 import '../../data/services/transaction_service.dart';
 import '../../data/services/wallet_service.dart';
+import '../../data/services/wealth_service.dart';
+import '../account/widgets/redeem_poin_sheet.dart';
 import '../services/service_navigation_helper.dart';
 import 'widgets/balance_card.dart';
 import 'widgets/cash_flow_card.dart';
@@ -93,10 +97,16 @@ class _HomePageState extends State<HomePage> {
     List<dynamic> transactions,
   ) {
     return [
-      GreetingSection(
-        userName: DummyData.userName,
-        membership: DummyData.membership,
-        points: DummyData.finPoin,
+      ValueListenableBuilder<UserProfileModel>(
+        valueListenable: AccountService.instance.userNotifier,
+        builder: (context, user, _) {
+          return GreetingSection(
+            userName: user.fullName,
+            membership: user.membership,
+            points: user.finPoin,
+            onMembershipTap: () => showRedeemPoinSheet(context),
+          );
+        },
       ),
       const SizedBox(height: AppSpacing.lg),
       BalanceCard(
@@ -153,6 +163,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHighlightsSection() {
+    final summary = WealthService.instance.calculateCashFlowSummary();
+    final firstGoal = WealthService.instance.savingGoals.firstOrNull;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -162,7 +175,7 @@ class _HomePageState extends State<HomePage> {
               child: Text('Sorotan Keuangan', style: AppTextStyles.h2),
             ),
             Text(
-              DummyData.highlightPeriod,
+              summary.period,
               style: AppTextStyles.caption.copyWith(
                 color: AppColors.textTertiary,
               ),
@@ -178,11 +191,11 @@ class _HomePageState extends State<HomePage> {
               onStateChanged: _refresh,
             );
           },
-          child: const CashFlowCard(
-            income: DummyData.monthlyIncome,
-            expense: DummyData.monthlyExpense,
-            incomeNote: DummyData.incomeGrowth,
-            expenseNote: DummyData.expenseNote,
+          child: CashFlowCard(
+            income: summary.totalIncome,
+            expense: summary.totalExpense,
+            incomeNote: summary.incomeGrowthLabel,
+            expenseNote: summary.expenseRatioLabel,
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -194,12 +207,12 @@ class _HomePageState extends State<HomePage> {
               onStateChanged: _refresh,
             );
           },
-          child: const SavingGoalCard(
-            title: DummyData.savingGoalTitle,
-            monthlyDebit: DummyData.savingGoalMonthly,
-            current: DummyData.savingGoalCurrent,
-            target: DummyData.savingGoalTarget,
-            eta: DummyData.savingGoalEta,
+          child: SavingGoalCard(
+            title: firstGoal?.title ?? 'Belum Ada Target Menabung',
+            monthlyDebit: firstGoal?.monthlyDebit ?? 0,
+            current: firstGoal?.currentAmount ?? 0,
+            target: firstGoal?.targetAmount ?? 1,
+            eta: firstGoal?.eta ?? '-',
           ),
         ),
       ],

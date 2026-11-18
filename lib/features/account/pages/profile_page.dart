@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../data/dummy/dummy_data.dart';
+import '../../../data/models/user_profile_model.dart';
+import '../../../data/services/account_service.dart';
 import '../../../shared/widgets/app_card.dart';
-import '../account_data.dart';
 import '../widgets/info_note.dart';
 import '../widgets/sub_page_scaffold.dart';
 
-/// Profil Saya: data diri dari KTP (terkunci) dan kontak (bisa diubah).
+/// Profil Saya terintegrasi [AccountService] & koleksi `users` di Firestore (Bagian Tugas Pidi).
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -18,12 +18,8 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  String _email = AccountDummy.email;
-  String _phone = DummyData.phoneNumber;
-  String _address = 'Jl. Melati No. 12, Jakarta Selatan';
-
-  String get _initials {
-    final parts = DummyData.userName.trim().split(RegExp(r'\s+'));
+  String _initials(String fullName) {
+    final parts = fullName.trim().split(RegExp(r'\s+'));
     if (parts.isEmpty || parts.first.isEmpty) return '?';
     final second = parts.length > 1 ? parts[1][0] : '';
     return (parts.first[0] + second).toUpperCase();
@@ -32,7 +28,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _edit({
     required String label,
     required String current,
-    required ValueChanged<String> onSaved,
+    required Future<void> Function(String) onSaved,
     TextInputType? keyboardType,
     int maxLines = 1,
   }) async {
@@ -54,88 +50,106 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (result != null && result.trim().isNotEmpty && mounted) {
-      setState(() => onSaved(result.trim()));
+      await onSaved(result.trim());
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$label berhasil diperbarui')),
+        SnackBar(content: Text('$label berhasil diperbarui & disimpan ke Firebase')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return SubPageScaffold(
-      title: 'Profil Saya',
-      children: [
-        _buildAvatar(),
-        const SizedBox(height: AppSpacing.section),
-        Text('Data Sesuai KTP', style: AppTextStyles.h2),
-        const SizedBox(height: AppSpacing.md),
-        AppCard(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          child: Column(
-            children:  [
-              _FieldRow(label: 'Nama Lengkap', value: DummyData.userName),
-              _FieldDivider(),
-              _FieldRow(label: 'NIK', value: '3174 •••• •••• 0001'),
-              _FieldDivider(),
-              _FieldRow(label: 'Tanggal Lahir', value: '14 Agustus 2001'),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.section),
-        Text('Kontak', style: AppTextStyles.h2),
-        const SizedBox(height: AppSpacing.md),
-        AppCard(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          child: Column(
-            children: [
-              _FieldRow(
-                label: 'Email',
-                value: _email,
-                onEdit: () => _edit(
-                  label: 'Email',
-                  current: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  onSaved: (v) => _email = v,
-                ),
+    return ValueListenableBuilder<UserProfileModel>(
+      valueListenable: AccountService.instance.userNotifier,
+      builder: (context, user, _) {
+        return SubPageScaffold(
+          title: 'Profil Saya',
+          children: [
+            _buildAvatar(user.fullName),
+            const SizedBox(height: AppSpacing.section),
+            Text('Data Sesuai KTP', style: AppTextStyles.h2),
+            const SizedBox(height: AppSpacing.md),
+            AppCard(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              child: Column(
+                children: [
+                  _FieldRow(
+                    label: 'Nama Lengkap',
+                    value: user.fullName,
+                    onEdit: () => _edit(
+                      label: 'Nama Lengkap',
+                      current: user.fullName,
+                      onSaved: (v) =>
+                          AccountService.instance.updateProfile(fullName: v),
+                    ),
+                  ),
+                  const _FieldDivider(),
+                  _FieldRow(label: 'NIK', value: user.nik),
+                  const _FieldDivider(),
+                  _FieldRow(label: 'Tanggal Lahir', value: user.birthDate),
+                ],
               ),
-              const _FieldDivider(),
-              _FieldRow(
-                label: 'Nomor HP',
-                value: _phone,
-                onEdit: () => _edit(
-                  label: 'Nomor HP',
-                  current: _phone,
-                  keyboardType: TextInputType.phone,
-                  onSaved: (v) => _phone = v,
-                ),
+            ),
+            const SizedBox(height: AppSpacing.section),
+            Text('Kontak', style: AppTextStyles.h2),
+            const SizedBox(height: AppSpacing.md),
+            AppCard(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+              child: Column(
+                children: [
+                  _FieldRow(
+                    label: 'Email',
+                    value: user.email,
+                    onEdit: () => _edit(
+                      label: 'Email',
+                      current: user.email,
+                      keyboardType: TextInputType.emailAddress,
+                      onSaved: (v) =>
+                          AccountService.instance.updateProfile(email: v),
+                    ),
+                  ),
+                  const _FieldDivider(),
+                  _FieldRow(
+                    label: 'Nomor HP',
+                    value: user.phoneNumber,
+                    onEdit: () => _edit(
+                      label: 'Nomor HP',
+                      current: user.phoneNumber,
+                      keyboardType: TextInputType.phone,
+                      onSaved: (v) =>
+                          AccountService.instance.updateProfile(phoneNumber: v),
+                    ),
+                  ),
+                  const _FieldDivider(),
+                  _FieldRow(
+                    label: 'Alamat',
+                    value: user.address,
+                    onEdit: () => _edit(
+                      label: 'Alamat',
+                      current: user.address,
+                      maxLines: 3,
+                      onSaved: (v) =>
+                          AccountService.instance.updateProfile(address: v),
+                    ),
+                  ),
+                ],
               ),
-              const _FieldDivider(),
-              _FieldRow(
-                label: 'Alamat',
-                value: _address,
-                onEdit: () => _edit(
-                  label: 'Alamat',
-                  current: _address,
-                  maxLines: 3,
-                  onSaved: (v) => _address = v,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.section),
-        const InfoNote(
-          icon: Icons.lock_outline_rounded,
-          title: 'Kenapa ada data yang terkunci?',
-          text: 'Nama, NIK, dan tanggal lahir mengikuti data KTP saat '
-              'verifikasi. Untuk mengubahnya, hubungi CS FinPay.',
-        ),
-      ],
+            ),
+            const SizedBox(height: AppSpacing.section),
+            const InfoNote(
+              icon: Icons.lock_outline_rounded,
+              title: 'Kenapa ada data yang terkunci?',
+              text: 'NIK dan tanggal lahir mengikuti data KTP saat '
+                  'verifikasi KYC. Untuk mengubahnya, hubungi CS FinPay.',
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildAvatar() {
+  Widget _buildAvatar(String fullName) {
     return Column(
       children: [
         Container(
@@ -148,12 +162,12 @@ class _ProfilePageState extends State<ProfilePage> {
             boxShadow: AppShadows.glow(AppColors.primary),
           ),
           child: Text(
-            _initials,
+            _initials(fullName),
             style: AppTextStyles.displayMedium.copyWith(color: Colors.white),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        Text(DummyData.userName, style: AppTextStyles.h2),
+        Text(fullName, style: AppTextStyles.h2),
         const SizedBox(height: AppSpacing.xxs),
         TextButton(
           onPressed: () => ScaffoldMessenger.of(context).showSnackBar(

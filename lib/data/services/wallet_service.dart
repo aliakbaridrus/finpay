@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../dummy/dummy_data.dart';
 import '../models/qris_model.dart';
@@ -422,11 +422,6 @@ class WalletService {
       final url = Uri.parse(
         '${FirebaseFirestoreConfig.baseUrl}/wallets/${wallet.userId}',
       );
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 6);
-      final request = await client.patchUrl(url);
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-
       final payload = {
         'fields': {
           'userId': {'stringValue': wallet.userId},
@@ -440,10 +435,13 @@ class WalletService {
         },
       };
 
-      request.write(jsonEncode(payload));
-      final response = await request.close();
-      await response.drain<void>();
-      client.close();
+      await http
+          .patch(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 6));
     } catch (_) {
       // Tetap aman secara lokal jika belum ada koneksi internet.
     }
@@ -454,13 +452,8 @@ class WalletService {
 
     try {
       final url = Uri.parse(
-        '${FirebaseFirestoreConfig.baseUrl}/midtrans_orders?documentId=${order.orderId}',
+        '${FirebaseFirestoreConfig.baseUrl}/midtrans_orders/${order.orderId}',
       );
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 6);
-      final request = await client.postUrl(url);
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-
       final payload = {
         'fields': {
           'orderId': {'stringValue': order.orderId},
@@ -475,10 +468,13 @@ class WalletService {
         },
       };
 
-      request.write(jsonEncode(payload));
-      final response = await request.close();
-      await response.drain<void>();
-      client.close();
+      await http
+          .patch(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 6));
     } catch (_) {}
   }
 }

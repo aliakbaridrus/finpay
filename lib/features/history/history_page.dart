@@ -4,12 +4,14 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/models/transaction_model.dart';
+import '../../data/services/auth_service.dart';
 import '../../data/services/transaction_service.dart';
+import '../../data/services/wealth_service.dart';
 import 'widgets/history_header.dart';
 import 'widgets/monthly_summary_card.dart';
 import 'widgets/transaction_list_group.dart';
 
-/// Halaman Riwayat Transaksi FinPay terintegrasi TransactionService (Bagian Ali).
+/// Halaman Riwayat Transaksi FinPay terintegrasi TransactionService & WealthService.
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
 
@@ -21,20 +23,12 @@ class _HistoryPageState extends State<HistoryPage> {
   final TextEditingController _searchController = TextEditingController();
   TransactionFilter _selectedFilter = TransactionFilter.all;
   String _searchQuery = '';
-  String _selectedMonth = 'Okt 2024';
+  String _selectedPeriod = 'Semua Waktu';
 
-  final List<String> _months = [
-    'Okt 2024',
-    'Sep 2024',
-    'Agus 2024',
-    'Juli 2024',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    TransactionService.instance.fetchTransactionsFromFirebase();
-  }
+  List<String> get _periodOptions => [
+        ...WealthService.availablePeriods,
+        'Pilih Rentang Tanggal (Kustom)',
+      ];
 
   @override
   void dispose() {
@@ -43,9 +37,13 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   List<TransactionModel> get _filteredTransactions {
-    return TransactionService.instance.getTransactions(
+    final bySearchAndType = TransactionService.instance.getTransactions(
       filter: _selectedFilter,
       searchQuery: _searchQuery,
+    );
+    return WealthService.instance.filterTransactionsByPeriod(
+      bySearchAndType,
+      _selectedPeriod,
     );
   }
 
@@ -61,50 +59,94 @@ class _HistoryPageState extends State<HistoryPage> {
         .fold(0, (sum, item) => sum + item.amount.abs());
   }
 
-  void _showMonthPicker() {
+  Future<void> _pickCustomDateRange() async {
+    final now = DateTime.now();
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      initialDateRange: DateTimeRange(
+        start: now.subtract(const Duration(days: 30)),
+        end: now,
+      ),
+    );
+    if (range != null && mounted) {
+      final startStr = AuthService.formatDeviceDate(
+        range.start,
+        shortMonthOnly: false,
+      );
+      final endStr = AuthService.formatDeviceDate(
+        range.end,
+        shortMonthOnly: false,
+      );
+      setState(() {
+        _selectedPeriod = '$startStr - $endStr';
+      });
+    }
+  }
+
+  void _showPeriodPicker() {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.xl,
             vertical: AppSpacing.lg,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Pilih Bulan', style: AppTextStyles.h2),
-              const SizedBox(height: AppSpacing.md),
-              for (final m in _months)
-                ListTile(
-                  title: Text(
-                    m,
-                    style: AppTextStyles.body.copyWith(
-                      fontWeight: m == _selectedMonth
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: m == _selectedMonth
-                          ? AppColors.primary
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-                  trailing: m == _selectedMonth
-                      ? const Icon(
-                          Icons.check_circle_rounded,
-                          color: AppColors.primary,
-                        )
-                      : null,
-                  onTap: () {
-                    setState(() => _selectedMonth = m);
-                    Navigator.pop(context);
-                  },
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pilih Rentang Waktu (Hari, Bulan, Tahun)',
+                  style: AppTextStyles.h2,
                 ),
-            ],
+                const SizedBox(height: AppSpacing.md),
+                for (final p in _periodOptions)
+                  ListTile(
+                    leading: Icon(
+                      p.contains('Kustom')
+                          ? Icons.date_range_rounded
+                          : Icons.calendar_today_rounded,
+                      size: 18,
+                      color: p == _selectedPeriod
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
+                    title: Text(
+                      p,
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: p == _selectedPeriod
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: p == _selectedPeriod
+                            ? AppColors.primary
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                    trailing: p == _selectedPeriod
+                        ? const Icon(
+                            Icons.check_circle_rounded,
+                            color: AppColors.primary,
+                          )
+                        : null,
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      if (p.contains('Kustom')) {
+                        await _pickCustomDateRange();
+                      } else {
+                        setState(() => _selectedPeriod = p);
+                      }
+                    },
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -144,23 +186,22 @@ class _HistoryPageState extends State<HistoryPage> {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
                         },
-                        selectedMonth: _selectedMonth,
-                        onSelectMonthTap: _showMonthPicker,
+                        selectedMonth: _selectedPeriod,
+                        onSelectMonthTap: _showPeriodPicker,
                       ),
                     ),
                   ),
 
-                  // Kartu Ringkasan Bulan Ini
+                  // Kartu Ringkasan Arus Kas (Murni dari transaksi user; jika kosong maka Rp 0)
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.page,
                     ),
                     sliver: SliverToBoxAdapter(
                       child: MonthlySummaryCard(
-                        totalIncome: _totalIncome > 0 ? _totalIncome : 5850000,
-                        totalExpense:
-                            _totalExpense > 0 ? _totalExpense : 1828500,
-                        periodLabel: _selectedMonth,
+                        totalIncome: _totalIncome,
+                        totalExpense: _totalExpense,
+                        periodLabel: _selectedPeriod,
                       ),
                     ),
                   ),

@@ -27,6 +27,8 @@ class RoundedProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = value.clamp(0.0, 1.0);
+    final filledFlex = (progress * 1000).round();
+    final remainFlex = ((1 - progress) * 1000).round();
 
     return ClipRRect(
       borderRadius: AppRadius.pillAll,
@@ -34,14 +36,16 @@ class RoundedProgressBar extends StatelessWidget {
         height: height,
         child: Row(
           children: [
-            Expanded(
-              flex: (progress * 1000).round(),
-              child: ColoredBox(color: color),
-            ),
-            Expanded(
-              flex: ((1 - progress) * 1000).round(),
-              child: ColoredBox(color: remainderColor ?? backgroundColor),
-            ),
+            if (filledFlex > 0)
+              Expanded(
+                flex: filledFlex,
+                child: ColoredBox(color: color),
+              ),
+            if (remainFlex > 0)
+              Expanded(
+                flex: remainFlex,
+                child: ColoredBox(color: remainderColor ?? backgroundColor),
+              ),
           ],
         ),
       ),

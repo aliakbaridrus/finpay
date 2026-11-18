@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../dummy/dummy_data.dart';
 import '../models/transaction_model.dart';
@@ -70,20 +70,18 @@ class TransactionService {
 
     try {
       final url = Uri.parse(
-        '${FirebaseFirestoreConfig.baseUrl}/transactions?documentId=${transaction.referenceNumber}',
+        '${FirebaseFirestoreConfig.baseUrl}/transactions/${transaction.referenceNumber}',
       );
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 6);
-      final request = await client.postUrl(url);
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-
       final firestorePayload = {
         'fields': _toFirestoreFields(transaction.toMap()),
       };
-      request.write(jsonEncode(firestorePayload));
-      final response = await request.close();
-      await response.drain<void>();
-      client.close();
+      await http
+          .patch(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(firestorePayload),
+          )
+          .timeout(const Duration(seconds: 6));
     } catch (_) {
       // Tetap aman menggunakan state lokal apabila jaringan sedang offline.
     }
@@ -99,15 +97,10 @@ class TransactionService {
 
     try {
       final url = Uri.parse('${FirebaseFirestoreConfig.baseUrl}/transactions');
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 6);
-      final request = await client.getUrl(url);
-      final response = await request.close();
-      final body = await response.transform(utf8.decoder).join();
-      client.close();
+      final response = await http.get(url).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(body) as Map<String, dynamic>;
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
         final documents = (decoded['documents'] as List<dynamic>?) ?? [];
         if (documents.isNotEmpty) {
           final fetched = documents.map((doc) {

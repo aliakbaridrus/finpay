@@ -32,22 +32,29 @@ class MonthlySummaryCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.donut_large_rounded,
-                    size: AppSizes.iconSm,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    'Ringkasan $periodLabel',
-                    style: AppTextStyles.label.copyWith(
-                      color: AppColors.textSecondary,
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.donut_large_rounded,
+                      size: AppSizes.iconSm,
+                      color: AppColors.primary,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: AppSpacing.xs),
+                    Flexible(
+                      child: Text(
+                        'Ringkasan $periodLabel',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.label.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: AppSpacing.sm),
               Text(
                 'Arus Kas',
                 style: AppTextStyles.labelSmall.copyWith(
@@ -94,19 +101,25 @@ class MonthlySummaryCard extends StatelessWidget {
             borderRadius: AppRadius.pillAll,
             child: SizedBox(
               height: 6,
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: (incomeRatio * 100).round(),
-                    child: Container(color: AppColors.success),
-                  ),
-                  const SizedBox(width: 2),
-                  Expanded(
-                    flex: ((1 - incomeRatio) * 100).round(),
-                    child: Container(color: AppColors.danger),
-                  ),
-                ],
-              ),
+              child: totalFlow <= 0
+                  ? Container(color: AppColors.border)
+                  : Row(
+                      children: [
+                        if (totalIncome > 0)
+                          Expanded(
+                            flex: (incomeRatio * 100).round().clamp(1, 100),
+                            child: Container(color: AppColors.success),
+                          ),
+                        if (totalIncome > 0 && totalExpense > 0)
+                          const SizedBox(width: 2),
+                        if (totalExpense > 0)
+                          Expanded(
+                            flex:
+                                ((1 - incomeRatio) * 100).round().clamp(1, 100),
+                            child: Container(color: AppColors.danger),
+                          ),
+                      ],
+                    ),
             ),
           ),
         ],

@@ -121,11 +121,16 @@ class HistoryHeader extends StatelessWidget {
                       color: AppColors.primary,
                     ),
                     const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      selectedMonth,
-                      style: AppTextStyles.label.copyWith(
-                        fontSize: 12,
-                        color: AppColors.textPrimary,
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 118),
+                      child: Text(
+                        selectedMonth,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.label.copyWith(
+                          fontSize: 12,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.xxs),

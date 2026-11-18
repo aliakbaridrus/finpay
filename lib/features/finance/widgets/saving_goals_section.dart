@@ -4,13 +4,15 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../data/models/wealth_models.dart';
+import '../../../data/services/wealth_service.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/pill_badge.dart';
 import '../../../shared/widgets/rounded_progress_bar.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../services/service_navigation_helper.dart';
 
-/// Section Target Menabung & Impian di Halaman Keuangan.
+/// Section Target Menabung & Impian di Halaman Keuangan terintegrasi [WealthService] (Bagian Tugas Pidi).
 class SavingGoalsSection extends StatelessWidget {
   const SavingGoalsSection({super.key, this.onStateChanged});
 
@@ -18,53 +20,42 @@ class SavingGoalsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SectionHeader(
-          title: 'Target Menabung',
-          actionLabel: '+ Tambah Target',
-          showChevron: false,
-          onActionTap: () => ServiceNavigationHelper.openService(
-            context,
-            'Menabung',
-            onStateChanged: onStateChanged,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-
-        // Goal Card 1: Liburan ke Jepang
-        _GoalCard(
-          title: 'Liburan ke Jepang ✈️',
-          category: 'Impian',
-          monthlyDebit: 500000,
-          currentAmount: 7500000,
-          targetAmount: 15000000,
-          eta: 'Mei 2025',
-          progressColor: AppColors.primary,
-          onSetorTap: () => ServiceNavigationHelper.openService(
-            context,
-            'Menabung',
-            onStateChanged: onStateChanged,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-
-        // Goal Card 2: Dana Darurat
-        _GoalCard(
-          title: 'Dana Darurat 6 Bulan 🛡️',
-          category: 'Keamanan',
-          monthlyDebit: 1000000,
-          currentAmount: 8000000,
-          targetAmount: 10000000,
-          eta: 'Desember 2024',
-          progressColor: AppColors.mint,
-          onSetorTap: () => ServiceNavigationHelper.openService(
-            context,
-            'Menabung',
-            onStateChanged: onStateChanged,
-          ),
-        ),
-      ],
+    return ValueListenableBuilder<List<SavingGoalModel>>(
+      valueListenable: WealthService.instance.savingGoalsNotifier,
+      builder: (context, goals, _) {
+        return Column(
+          children: [
+            SectionHeader(
+              title: 'Target Menabung',
+              actionLabel: '+ Tambah Target',
+              showChevron: false,
+              onActionTap: () => ServiceNavigationHelper.openService(
+                context,
+                'Menabung',
+                onStateChanged: onStateChanged,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            for (var i = 0; i < goals.length; i++) ...[
+              _GoalCard(
+                title: goals[i].title,
+                category: goals[i].category,
+                monthlyDebit: goals[i].monthlyDebit,
+                currentAmount: goals[i].currentAmount,
+                targetAmount: goals[i].targetAmount,
+                eta: goals[i].eta,
+                progressColor: goals[i].color,
+                onSetorTap: () => ServiceNavigationHelper.openService(
+                  context,
+                  'Menabung',
+                  onStateChanged: onStateChanged,
+                ),
+              ),
+              if (i != goals.length - 1) const SizedBox(height: AppSpacing.md),
+            ],
+          ],
+        );
+      },
     );
   }
 }

@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../data/services/auth_service.dart';
 import '../widgets/sub_page_scaffold.dart';
 
-/// Ubah PIN dalam 3 tahap: PIN lama -> PIN baru -> konfirmasi.
+/// Ubah PIN 6 Digit terintegrasi [AuthService] & koleksi `users` (Bagian Tugas Pidi).
 /// Menutup halaman dengan hasil `true` kalau PIN berhasil diubah.
 class ChangePinPage extends StatefulWidget {
   const ChangePinPage({super.key});
@@ -15,8 +16,6 @@ class ChangePinPage extends StatefulWidget {
 }
 
 class _ChangePinPageState extends State<ChangePinPage> {
-  // DEMO: PIN lama di-hardcode. Nanti diganti verifikasi ke backend.
-  static const String _currentPin = '123456';
   static const int _length = 6;
 
   static const List<String> _titles = [
@@ -32,6 +31,7 @@ class _ChangePinPageState extends State<ChangePinPage> {
 
   int _stage = 0;
   String _input = '';
+  String _oldPinInput = '';
   String _newPin = '';
   String? _error;
 
@@ -75,16 +75,17 @@ class _ChangePinPageState extends State<ChangePinPage> {
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     switch (_stage) {
       case 0:
-        if (_input != _currentPin) {
+        if (!AuthService.instance.validatePin(_input)) {
           _fail('PIN lama salah, coba lagi.');
         } else {
+          _oldPinInput = _input;
           _goTo(1);
         }
       case 1:
-        if (_input == _currentPin) {
+        if (_input == _oldPinInput) {
           _fail('PIN baru tidak boleh sama dengan PIN lama.');
         } else if (_tooEasy(_input)) {
           _fail('PIN terlalu mudah ditebak, coba kombinasi lain.');
@@ -101,13 +102,25 @@ class _ChangePinPageState extends State<ChangePinPage> {
             _error = 'PIN tidak cocok. Ulangi dari PIN baru.';
           });
         } else {
-          Navigator.pop(context, true);
+          try {
+            await AuthService.instance.changePin(
+              oldPin: _oldPinInput,
+              newPin: _newPin,
+            );
+            if (!mounted) return;
+            Navigator.pop(context, true);
+          } catch (e) {
+            if (!mounted) return;
+            _fail(e.toString().replaceFirst('Exception: ', ''));
+          }
         }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentActivePin = AuthService.instance.currentUser.pin;
+
     return SubPageScaffold(
       title: 'Ubah PIN',
       children: [
@@ -142,7 +155,7 @@ class _ChangePinPageState extends State<ChangePinPage> {
         const SizedBox(height: AppSpacing.sm),
         Center(
           child: Text(
-            'Mode demo: PIN lama adalah 123456',
+            'PIN Aktif Saat Ini: $currentActivePin',
             style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
           ),
         ),

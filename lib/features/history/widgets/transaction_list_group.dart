@@ -212,9 +212,13 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl * 2),
-      child: Center(
+    return AppCard(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.xxl,
+      ),
+      child: SizedBox(
+        width: double.infinity,
         child: Column(
           children: [
             Container(
@@ -224,20 +228,20 @@ class _EmptyState extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.search_off_rounded,
+                Icons.receipt_long_outlined,
                 size: 40,
                 color: AppColors.primary,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              'Tidak Ada Transaksi',
+              'Belum Ada Aktivitas Arus Kas',
               style: AppTextStyles.h3,
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Tidak ada riwayat transaksi yang cocok dengan pencarian atau filter yang kamu pilih.',
-              style: AppTextStyles.caption,
+              'Belum ada uang masuk atau uang keluar pada periode ini. Yuk, mulai Top Up saldo, Transfer, atau Bayar QRIS untuk melihat riwayat arus kasmu di sini!',
+              style: AppTextStyles.caption.copyWith(height: 1.4),
               textAlign: TextAlign.center,
             ),
           ],
