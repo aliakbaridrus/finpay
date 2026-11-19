@@ -365,6 +365,52 @@ class AccountService {
     return null;
   }
 
+  /// Mencari pengguna berdasarkan Nomor HP (ternormalisasi) di koleksi `users` pada Firebase Firestore.
+  Future<UserProfileModel?> findUserByPhoneFromFirestore(String phone) async {
+    if (!FirebaseFirestoreConfig.isConfigured) return null;
+    final normalizedTarget = _normalizePhoneDigits(phone);
+    if (normalizedTarget.isEmpty) return null;
+
+    try {
+      final url = Uri.parse('${FirebaseFirestoreConfig.baseUrl}/users');
+      final response = await http.get(url).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final docs = (decoded['documents'] as List<dynamic>?) ?? [];
+        for (final doc in docs) {
+          final docMap = doc as Map<String, dynamic>;
+          final fields = docMap['fields'] as Map<String, dynamic>?;
+          if (fields == null) continue;
+
+          final parsedMap = fromFirestoreFields(fields);
+          final docPhone = _normalizePhoneDigits(
+            parsedMap['phoneNumber']?.toString() ?? '',
+          );
+          if (docPhone == normalizedTarget) {
+            final namePath = (docMap['name'] as String?) ?? '';
+            final docId = namePath.contains('/')
+                ? namePath.split('/').last
+                : (parsedMap['userId']?.toString() ?? 'finpay_user_01');
+            return UserProfileModel.fromMap(parsedMap, docId: docId);
+          }
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  String _normalizePhoneDigits(String raw) {
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('62')) {
+      digits = digits.substring(2);
+    } else if (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    return digits;
+  }
+
   /// Mengambil daftar rekening bank milik `userId` dari koleksi `linked_accounts` di Firestore.
   Future<List<LinkedAccountModel>?> fetchLinkedAccountsForUser(
     String userId,

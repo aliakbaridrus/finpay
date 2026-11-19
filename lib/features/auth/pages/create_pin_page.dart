@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../data/services/auth_service.dart';
 import '../data/auth_flow_args.dart';
 import '../data/auth_repository.dart';
 import '../utils/auth_validators.dart';
@@ -33,11 +34,12 @@ class _CreatePinPageState extends State<CreatePinPage> {
   String _firstPin = '';
   String? _error;
   int _shake = 0;
+  bool _saving = false;
 
   bool get _isReset => widget.args.purpose == AuthPurpose.resetPin;
 
   void _onDigit(String digit) {
-    if (_input.length >= _length) return;
+    if (_saving || _input.length >= _length) return;
     setState(() {
       _input += digit;
       _error = null;
@@ -50,7 +52,7 @@ class _CreatePinPageState extends State<CreatePinPage> {
   }
 
   void _onBackspace() {
-    if (_input.isEmpty) return;
+    if (_saving || _input.isEmpty) return;
     setState(() => _input = _input.substring(0, _input.length - 1));
   }
 
@@ -93,16 +95,46 @@ class _CreatePinPageState extends State<CreatePinPage> {
     _complete();
   }
 
-  void _complete() {
+  Future<void> _complete() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+
     final args = widget.args;
 
     if (_isReset) {
       final ok = authRepository.resetPin(phone: args.phone, newPin: _firstPin);
+      await AuthService.instance.resetPinByPhone(
+        phone: args.phone,
+        newPin: _firstPin,
+      );
+      if (!mounted) return;
       if (!ok) {
-        _fail('Nomor tidak ditemukan. Ulangi dari awal.', restart: true);
-        return;
+        // Tetap izinkan lanjut jika nomor ada di Firestore, atau tampilkan pesan bila gagal lokal.
+        setState(() => _saving = false);
       }
     } else {
+      try {
+        await AuthService.instance.register(
+          fullName: args.name ?? '',
+          nik: args.nik,
+          birthDate: args.birthDate != null
+              ? AuthService.formatDeviceDate(args.birthDate!)
+              : null,
+          address: args.address,
+          email: args.email ?? '',
+          phoneNumber: '0${args.phone}',
+          password: _firstPin,
+          pin: _firstPin,
+          usedReferralCode: args.referral,
+          initialCash: 0,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _saving = false);
+        _fail(e.toString().replaceFirst('Exception: ', ''), restart: true);
+        return;
+      }
+
       try {
         authRepository.register(
           name: args.name ?? '',
@@ -112,14 +144,12 @@ class _CreatePinPageState extends State<CreatePinPage> {
           birthDate: args.birthDate,
         );
       } on StateError {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nomor ini sudah terdaftar.')),
-        );
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        return;
+        // Nomor sudah ada di cache memori lokal; sesi utama tetap aktif di AuthService.
       }
     }
 
+    if (!mounted) return;
+    setState(() => _saving = false);
     Navigator.of(context).push(authRoute<void>(AuthSuccessPage(args: args)));
   }
 
@@ -155,7 +185,11 @@ class _CreatePinPageState extends State<CreatePinPage> {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        PinKeypad(onDigit: _onDigit, onBackspace: _onBackspace),
+        PinKeypad(
+          onDigit: _onDigit,
+          onBackspace: _onBackspace,
+          enabled: !_saving,
+        ),
       ],
     );
   }

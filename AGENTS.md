@@ -1,93 +1,104 @@
-# AGENTS.md — Arsitektur & Standar Penulisan Kode FinPay
+# AGENTS.md — Arsitektur & Standar Penulisan Kode FinPay (Audit Faktual)
 
-Dokumen ini merupakan acuan arsitektur perangkat lunak, standar kode, dan pola pengembangan untuk proyek **FinPay** (Aplikasi Dompet Digital, Pembayaran QRIS, & Layanan Keuangan). Gunakan panduan ini sebagai standar wajib saat membuat fitur baru atau memodifikasi fitur yang ada.
+Dokumen ini merupakan acuan arsitektur perangkat lunak, standar kode, dan pola pengembangan berbasis **fakta kode nyata** untuk proyek **FinPay** (`finpay/pubspec.yaml` — Aplikasi Dompet Digital, Pembayaran QRIS, & Layanan Keuangan). Gunakan panduan ini bersama dengan `.agents/rules/standar-ewallet.md` dan `.agents/skills/alur-kerja-aman/skill.md`.
 
 ---
 
-## 1. Tech Stack, Framework, & Library
+## 1. Tech Stack, Framework, & Library (Berdasarkan `finpay/pubspec.yaml` & Kode Sumber)
 
 - **Framework & SDK**:
-  - **Flutter** (Material 3 / `useMaterial3: true`)
-  - **Dart SDK**: `>=3.3.0 <4.0.0` (memanfaatkan fitur modern Dart 3 seperti *class modifiers* `abstract final class`, *pattern matching / switch expressions*, dan *named records* `({Type a, Type b})`).
-- **Dependencies Utama** (`pubspec.yaml`):
-  - `google_fonts: ^6.3.3` — Tipografi utama berbasis font **Plus Jakarta Sans**.
-  - `qr_flutter: ^4.1.0` — Rendering QR Code standar EMVCo QRIS.
-- **Linter & Static Analysis** (`analysis_options.yaml`):
-  - `flutter_lints: ^4.0.0` dengan aturan ketat:
+  - **Flutter** dengan Material 3 (`useMaterial3: true` terbukti di `finpay/lib/core/theme/app_theme.dart`).
+  - **Dart SDK**: `>=3.3.0 <4.0.0` (terbukti di `finpay/pubspec.yaml`), memanfaatkan fitur Dart 3:
+    - *Class modifiers* `abstract final class` (`finpay/lib/core/theme/app_colors.dart`, `finpay/lib/core/theme/app_dimens.dart`).
+    - *Switch expressions* (`finpay/lib/data/models/transaction_model.dart`, `finpay/lib/features/main/main_page.dart`).
+    - *Named records* `({Type a, Type b})` (`finpay/lib/data/services/wallet_service.dart`, `finpay/lib/data/services/account_service.dart`, `finpay/lib/data/services/wealth_service.dart`).
+- **Dependencies Utama** (`finpay/pubspec.yaml`):
+  - `google_fonts: ^6.3.3` — Tipografi berbasis font **Plus Jakarta Sans** (`finpay/lib/core/theme/app_text_styles.dart`).
+  - `http: ^1.6.0` — Klien HTTP lintas platform (Web/Chrome, Android, Desktop) untuk REST API Firebase Firestore & Firebase Auth (`finpay/lib/data/services/auth_service.dart`, `finpay/lib/data/services/account_service.dart`, `finpay/lib/data/services/wealth_service.dart`, `finpay/lib/data/services/wallet_service.dart`, `finpay/lib/data/services/transaction_service.dart`).
+  - `qr_flutter: ^4.1.0` — Rendering QR Code standar EMVCo QRIS (`finpay/lib/shared/widgets/qris_code_card.dart`).
+- **Dev Dependencies & Linter** (`finpay/pubspec.yaml` & `finpay/analysis_options.yaml`):
+  - `flutter_test` (SDK) & `flutter_lints: ^4.0.0` dengan aturan aktif:
     - `prefer_const_constructors: true`
     - `prefer_const_literals_to_create_immutables: true`
     - `prefer_single_quotes: true`
-- **Integrasi Eksternal & Jaringan (Zero Extra Dependency)**:
-  - **Firebase Cloud Firestore REST API**: Sinkronisasi koleksi (`wallets`, `transactions`, `midtrans_orders`, `support_chats`) menggunakan `dart:io` (`HttpClient`) dan `dart:convert` tanpa ketergantungan plugin native berat.
-  - **Midtrans Sandbox API**: Pembuatan Snap Token (`POST /snap/v1/transactions`) dan pengecekan status pembayaran (`GET /v2/{orderId}/status`) dengan fallback simulator lokal otomatis.
-  - **Standar EMVCo QRIS**: Parser, generator payload TLV (*Tag-Length-Value*), dan kalkulasi checksum `CRC16/CCITT-FALSE` mandiri di `qris_model.dart`.
+- **Integrasi Eksternal & Engine Internal**:
+  - **Firebase Cloud Firestore REST API**: Sinkronisasi 9 koleksi (`wallets`, `transactions`, `midtrans_orders`, `support_chats`, `users`, `linked_accounts`, `saving_goals`, `loans`, `promos`) ke endpoint `https://firestore.googleapis.com/v1/projects/finpay-app-4026a/databases/(default)/documents` (`finpay/lib/data/services/transaction_service.dart`).
+  - **Firebase Auth REST API**: Login & Register Email/Password ke endpoint `identitytoolkit.googleapis.com` dengan fallback autentikasi Firestore/lokal (`finpay/lib/data/services/auth_service.dart`).
+  - **Midtrans Sandbox API**: Pembuatan Snap Token (`POST /snap/v1/transactions`) dan cek status (`GET /v2/{orderId}/status`) menggunakan `dart:io` (`HttpClient`) dengan fallback simulator lokal (`finpay/lib/data/services/midtrans_service.dart`).
+  - **Standar EMVCo QRIS Engine**: Parser & encoder payload TLV (*Tag-Length-Value*) beserta kalkulasi checksum `CRC16/CCITT-FALSE` mandiri (`finpay/lib/data/models/qris_model.dart`).
+  - **Pure Dart PDF 1.4 Engine**: Pembuat dokumen e-Statement `.pdf` murni beserta pengunduh lintas platform (`finpay/lib/core/utils/pdf_statement_generator.dart`, `pdf_downloader_web.dart`, `pdf_downloader_io.dart`, `pdf_downloader_stub.dart`).
 
 ---
 
-## 2. Arsitektur & Struktur Direktori
+## 2. Arsitektur & Struktur Direktori Nyata
 
-Proyek menggunakan pendekatan **Feature-First dikombinasikan dengan Layer-Based Core/Data/Shared** di dalam `lib/`:
+Workspace memiliki folder paket Flutter utama di `finpay/`. Di dalam `finpay/lib/`, proyek menggunakan pendekatan **Feature-First dikombinasikan dengan Layer-Based (`core`, `data`, `shared`)**:
 
 ```text
-lib/
-├── main.dart                  # Entry point, konfigurasi SystemChrome, MaterialApp, & routing utama ('/' & '/admin')
-├── core/                      # Layer fundamental & utilitas global (tidak bergantung pada fitur)
-│   ├── theme/                 # Design system tokens (AppColors, AppSpacing, AppRadius, AppSizes, AppShadows, AppTextStyles, AppTheme)
-│   └── utils/                 # Helper murni tanpa state (contoh: CurrencyFormatter)
-├── data/                      # Layer data, domain model, state in-memory, & service backend
-│   ├── dummy/                 # Sumber data lokal / in-memory store (DummyData)
-│   ├── models/                # Immutable data models, serialisasi Firestore & parser QRIS
-│   └── services/              # Singleton services (WalletService, TransactionService, QrisService, MidtransService, SupportChatService)
-├── features/                  # Modul fitur mandiri berbasis halaman/tab
-│   ├── main/                  # Shell navigasi utama (IndexedStack + FinPayBottomNavBar)
-│   ├── home/                  # Tab Beranda & widget spesifik beranda
-│   ├── history/               # Tab Riwayat Transaksi, filter, & e-statement
-│   ├── pay/                   # Tab Scan QRIS, QRIS Saya, & Tarik Tunai
-│   ├── finance/               # Tab Portofolio Keuangan, kesehatan finansial, & target menabung
-│   ├── account/               # Tab Akun, pengaturan keamanan, KYC, & sub-halaman profil
-│   ├── services/              # Halaman penuh layanan finansial (Top Up, Transfer, Tabungan, Pinjaman, Cash Flow, Promo)
-│   └── admin/                 # Portal Web Admin Dashboard ('/admin')
-└── shared/                    # Komponen UI lintas fitur
-    ├── dialogs/               # Modal bottom sheets aksi finansial & dialog struk transaksi (FinPayReceiptDialog)
-    └── widgets/               # Atomic/reusable widgets (AppCard, IconBox, MenuGrid, PillBadge, QrisCodeCard, dll.)
+finpay/
+├── pubspec.yaml               # Konfigurasi paket & dependencies Flutter
+├── analysis_options.yaml      # Konfigurasi linter flutter_lints
+├── lib/
+│   ├── main.dart              # Entry point, FinPayApp, _AuthGate, & routing ('/', '/login', '/admin')
+│   ├── core/                  # Layer fundamental & utilitas global
+│   │   ├── theme/             # Design tokens (app_colors.dart, app_dimens.dart, app_text_styles.dart, app_theme.dart)
+│   │   └── utils/             # Helper format Rupiah & generator file .pdf (currency_formatter.dart, pdf_statement_generator.dart, pdf_downloader_*.dart)
+│   ├── data/                  # Layer data, domain model, state in-memory, & service backend
+│   │   ├── dummy/             # In-memory store (dummy_data.dart)
+│   │   ├── models/            # 9 file model (wallet_model.dart, transaction_model.dart, qris_model.dart, qris_merchant.dart, user_profile_model.dart, linked_account_model.dart, wealth_models.dart, support_chat_model.dart, menu_item_data.dart)
+│   │   └── services/          # 8 singleton services:
+│   │                          # - Bagian Ali: wallet_service.dart, transaction_service.dart, midtrans_service.dart, qris_service.dart, support_chat_service.dart
+│   │                          # - Bagian Pidi: auth_service.dart, account_service.dart, wealth_service.dart
+│   ├── features/              # Modul fitur mandiri berbasis halaman/tab
+│   │   ├── auth/              # Halaman Login & Register Email/Password + Referral (login_page.dart)
+│   │   ├── main/              # Shell navigasi utama IndexedStack + bottom nav (main_page.dart, widgets/finpay_bottom_nav_bar.dart)
+│   │   ├── home/              # Tab Beranda & 10 widget spesifik beranda (home_page.dart, widgets/*)
+│   │   ├── history/           # Tab Riwayat Transaksi, filter rentang waktu, detail, & unduh e-Statement .PDF (history_page.dart, e_statement_page.dart, transaction_detail_page.dart, widgets/*)
+│   │   ├── pay/               # Tab Scan QRIS, QRIS Saya, & Tarik Tunai (pay_page.dart, widgets/*)
+│   │   ├── finance/           # Tab Portofolio Keuangan, kesehatan finansial, & target menabung (finance_page.dart, widgets/*)
+│   │   ├── account/           # Tab Akun, FinPoin & Referral, PIN, KYC, Limit, Rekening/Kartu, & 15 sub-halaman (account_page.dart, pages/*, widgets/*)
+│   │   ├── services/          # Halaman penuh layanan finansial (top_up_page.dart, transfer_page.dart, savings_page.dart, loan_page.dart, cash_flow_page.dart, promos_page.dart, service_navigation_helper.dart)
+│   │   └── admin/             # Portal Web Admin Dashboard '/admin' (admin_dashboard_page.dart)
+│   └── shared/                # Komponen UI lintas fitur
+│       ├── dialogs/           # Bottom sheet aksi finansial & dialog struk (financial_action_sheets.dart, sheets/*, widgets/finpay_receipt_dialog.dart)
+│       └── widgets/           # 7 reusable widgets (app_card.dart, icon_box.dart, menu_grid.dart, pill_badge.dart, qris_code_card.dart, rounded_progress_bar.dart, section_header.dart)
+└── test/                      # Unit & widget tests (wallet_service_test.dart, qris_model_test.dart, pidi_services_test.dart, widget_test.dart)
 ```
 
 ### Aturan Batasan Layer (Layer Boundaries)
-1. **`core/`** tidak boleh mengimpor apa pun dari `data/`, `features/`, atau `shared/`.
-2. **`data/`** hanya boleh mengimpor dari `core/` (mis. `AppColors` untuk warna badge default). `data/services/` tidak boleh memegang referensi `BuildContext`.
-3. **`shared/`** berisi komponen UI generik atau dialog transaksi yang dipakai oleh lebih dari satu fitur.
-4. **`features/`** mengonsumsi `core/`, `data/`, dan `shared/`. Widget yang hanya dipakai di satu fitur wajib ditempatkan di `features/<nama_fitur>/widgets/`.
+1. **`core/theme/`** dan **`core/utils/currency_formatter.dart`** adalah modul murni yang tidak mengimpor dari `data/`, `features/`, atau `shared/`. *(Pengecualian faktual: `core/utils/pdf_statement_generator.dart` mengimpor model dari `data/models/` untuk merender data transaksi ke byte PDF).*
+2. **`data/`** hanya mengimpor dari `core/` (contoh: `AppColors` di `finpay/lib/data/dummy/dummy_data.dart` dan `finpay/lib/data/models/wealth_models.dart`). `data/services/` tidak boleh memegang referensi `BuildContext`.
+3. **`shared/`** berisi komponen UI generik atau dialog transaksi yang dipakai lintas fitur (`finpay/lib/shared/widgets/app_card.dart`, `finpay/lib/shared/dialogs/financial_action_sheets.dart`).
+4. **`features/`** mengonsumsi `core/`, `data/`, dan `shared/`. Widget spesifik fitur ditempatkan di `features/<nama_fitur>/widgets/`.
 
 ---
 
 ## 3. Standar Penulisan Kode (Coding Conventions)
 
 ### A. Penamaan (Naming Conventions)
-- **File & Folder**: `snake_case.dart` (contoh: `wallet_service.dart`, `qris_confirm_sheet.dart`).
+- **File & Folder**: `snake_case.dart` (bukti: `finpay/lib/data/services/wallet_service.dart`, `finpay/lib/features/pay/widgets/qris_confirm_sheet.dart`).
 - **Kelas, Enum, & Typedef**: `PascalCase` dengan sufiks sesuai peran:
-  - Model: `*Model` / `*Data` / `*Payload` (contoh: `TransactionModel`, `WalletModel`, `QrisPayload`).
-  - Service: `*Service` (contoh: `WalletService`, `TransactionService`).
-  - Halaman utama/sub-halaman: `*Page` (contoh: `HomePage`, `TransferPage`).
-  - Bottom sheet: `*Sheet` (contoh: `TransferActionSheet`, `QrisConfirmSheet`).
-  - Helper navigasi: `*NavigationHelper` (contoh: `ServiceNavigationHelper`).
-- **Variabel, Fungsi, & Parameter**: `camelCase`. Anggota privat diawali underscore (`_selectedFilter`, `_syncWalletToFirestore`).
-- **Namespace Konstanta**: Gunakan `abstract final class` dengan properti `static const` (contoh: `AppColors`, `AppSpacing`, `AppRadius`, `AppSizes`, `CurrencyFormatter`).
+  - Model: `*Model` / `*Data` / `*Payload` / `*Result` (bukti: `TransactionModel`, `UserProfileModel`, `MenuItemData`, `QrisPayload`, `MidtransOrderResult`).
+  - Service: `*Service` (bukti: `WalletService`, `AuthService`, `AccountService`, `WealthService`).
+  - Halaman utama/sub-halaman: `*Page` (bukti: `LoginPage`, `HomePage`, `HistoryPage`, `EStatementPage`).
+  - Bottom sheet: `*Sheet` (bukti: `TransferActionSheet`, `RedeemPoinSheet`, `QrisConfirmSheet`).
+  - Helper navigasi: `*NavigationHelper` (bukti: `ServiceNavigationHelper`, `AccountNavigationHelper`).
+- **Variabel, Fungsi, & Parameter**: `camelCase`. Anggota privat diawali underscore (`_selectedPeriod`, `_syncWalletToFirestore`).
+- **Namespace Konstanta**: Gunakan `abstract final class` dengan properti `static const` (bukti: `AppColors`, `AppSpacing`, `AppRadius`, `AppSizes`, `CurrencyFormatter`).
 
 ### B. Gaya Bahasa & Kutipan
-- **Single Quotes**: Wajib menggunakan kutipan tunggal (`'...'`) untuk semua string sesuai aturan linter.
+- **Single Quotes**: Wajib menggunakan kutipan tunggal (`'...'`) untuk semua string sesuai `finpay/analysis_options.yaml`.
 - **Immutability & `const`**:
-  - Semua field pada Model dan Widget harus `final`.
-  - Selalu gunakan `const` pada konstruktor widget dan deklarasi list/elemen statis.
+  - Field pada Model dan Widget menggunakan `final` (dengan metode `copyWith` untuk pembaruan state pada `WalletModel`, `UserProfileModel`, `LinkedAccountModel`, `SavingGoalModel`, `LoanModel`, `PromoModel`).
+  - Gunakan `const` pada konstruktor widget dan deklarasi elemen statis.
 - **Bahasa Komentar & UI**:
-  - Teks antarmuka pengguna (UI), pesan error ke pengguna, dan komentar dokumentasi (`///`) ditulis dalam **Bahasa Indonesia** yang jelas dan ringkas.
-  - Identifier kode (nama class, method, variabel) ditulis dalam **Bahasa Inggris** (kecuali method domain spesifik seperti `CurrencyFormatter.rupiah`).
+  - Teks antarmuka pengguna (UI), pesan `Exception`, dan komentar dokumentasi (`///`) ditulis dalam **Bahasa Indonesia**.
+  - Identifier kode ditulis dalam **Bahasa Inggris** (kecuali fungsi domain spesifik seperti `CurrencyFormatter.rupiah` atau handler lokal seperti `_setorTabungan` di `finpay/lib/features/services/savings_page.dart`).
 
 ### C. Struktur Fungsi & Pemisahan Widget
-- **Signature Fungsi**: Gunakan *named parameters* (`{required this.a, this.b}`) untuk konstruktor widget, model, dan method service yang memiliki lebih dari 1 parameter.
-- **Multiple Return Values**: Gunakan **Dart 3 Named Records** untuk fungsi yang mengembalikan lebih dari satu nilai (contoh: `Future<({TransactionModel transaction, int monthlyInstallment})> disburseLoan(...)`).
-- **Widget Decomposition**:
-  - Utamakan membuat *private StatelessWidget* (`class _FilterChip extends StatelessWidget`) di bagian bawah file dibandingkan helper method pembuat widget yang panjang, agar Flutter dapat mengoptimalkan rebuild.
-  - Helper method `_build*()` hanya digunakan di dalam `State` jika bergantung langsung pada state internal halaman tersebut.
+- **Signature Fungsi**: Gunakan *named parameters* (`{required this.a, this.b}`) untuk konstruktor widget, model, dan method service.
+- **Multiple Return Values**: Gunakan **Dart 3 Named Records** (bukti: `Future<({TransactionModel transaction, int monthlyInstallment})> disburseLoan(...)` di `finpay/lib/data/services/wallet_service.dart` dan `Future<({TransactionModel transaction, int cashAdded})> redeemFinPoin(...)` di `finpay/lib/data/services/account_service.dart`).
+- **Widget Decomposition**: Buat *private StatelessWidget* di bagian bawah file (bukti: `_FilterChip` di `finpay/lib/features/history/history_page.dart`, `_AuthTabButton` di `finpay/lib/features/auth/login_page.dart`).
 
 ---
 
@@ -96,67 +107,52 @@ lib/
 Proyek ini **tidak menggunakan package state management eksternal** (seperti Bloc, Provider, atau Riverpod), melainkan mengandalkan arsitektur reaktif bawaan Flutter:
 
 1. **Singleton Service + `ValueNotifier`**:
-   - Setiap service dideklarasikan sebagai singleton dengan konstruktor privat:
-     ```dart
-     class WalletService {
-       WalletService._();
-       static final WalletService instance = WalletService._();
-       final ValueNotifier<WalletModel> walletNotifier = ValueNotifier<WalletModel>(...);
-     }
-     ```
-   - UI mendengarkan perubahan state global menggunakan `ValueListenableBuilder<T>` (contoh: memantau `walletNotifier`, `transactionsNotifier`, atau `messagesNotifier`).
-2. **In-Memory Store & Offline-First Sync**:
-   - `DummyData` berfungsi sebagai *in-memory single source of truth* agar mutasi saldo dan transaksi langsung terasa instan di seluruh halaman.
-   - Setiap mutasi di service wajib:
-     1. Memvalidasi input terlebih dahulu.
-     2. Memperbarui state lokal (`DummyData`) dan memicu `notifier.value = ...` (dengan membuat instance atau `List.from(...)` baru agar listener terpicu).
-     3. Menyinkronkan data ke Firebase Firestore secara asinkron di latar belakang.
+   - Setiap service dideklarasikan sebagai singleton dengan konstruktor privat (`ServiceName._()` dan `static final ServiceName instance = ServiceName._()`).
+   - State reaktif diekspos melalui `ValueNotifier<T>`:
+     - `AuthService.instance.isLoggedInNotifier` & `currentUserNotifier` (`finpay/lib/data/services/auth_service.dart`)
+     - `AccountService.instance.userNotifier` & `linkedAccountsNotifier` (`finpay/lib/data/services/account_service.dart`)
+     - `WalletService.instance.walletNotifier` (`finpay/lib/data/services/wallet_service.dart`)
+     - `TransactionService.instance.transactionsNotifier` (`finpay/lib/data/services/transaction_service.dart`)
+     - `WealthService.instance.savingGoalsNotifier`, `activeLoansNotifier`, & `promosNotifier` (`finpay/lib/data/services/wealth_service.dart`)
+     - `SupportChatService.instance.messagesNotifier` (`finpay/lib/data/services/support_chat_service.dart`)
+   - UI mendengarkan perubahan state menggunakan `ValueListenableBuilder<T>`.
+2. **Isolasi Sesi Multi-User & Sinkronisasi Firestore**:
+   - Pengguna baru yang mendaftar melalui `AuthService.instance.register(...)` wajib memulai dengan **Saldo Rp 0** (`initialCash: 0`, `savingBalance: 0`) dan daftar transaksi kosong (`finpay/lib/data/services/auth_service.dart`).
+   - Saat pengguna lama login melalui `AuthService.instance.login(...)`, sistem mencari profil pengguna di koleksi `users` Firebase Firestore dan memulihkan saldo (`wallets/{uid}`), riwayat transaksi (`transactions`), rekening (`linked_accounts`), tabungan (`saving_goals`), serta pinjaman (`loans`) milik `userId` tersebut.
 3. **Ephemeral UI State**:
-   - State lokal halaman (seperti tab aktif, filter chip, input form, status `_isProcessing`, toggle visibilitas) dikelola menggunakan `StatefulWidget` dan `setState()`.
-   - Semua `TextEditingController` dan `AnimationController` **wajib** di-`dispose()` pada lifecycle `dispose()`.
+   - State lokal halaman dikelola dengan `StatefulWidget` dan `setState()`.
+   - Semua `TextEditingController` dan `AnimationController` wajib di-`dispose()` pada `dispose()`.
 
 ---
 
-## 5. Penanganan Error (Error Handling)
+## 5. Penanganan Error & Keamanan UI
 
 1. **Validasi Bisnis & Domain Exceptions**:
-   - Gunakan custom exception bertipe jelas untuk domain kompleks (contoh: `class QrisFormatException implements Exception` untuk validasi format, panjang TLV, atau checksum CRC16 QRIS).
-   - Untuk validasi transaksi di `WalletService` (saldo tidak cukup, nominal `<= 0`, order duplikat), lempar `Exception('Pesan error dalam Bahasa Indonesia')`.
+   - Gunakan `QrisFormatException` (`finpay/lib/data/models/qris_model.dart`) untuk error validasi QRIS EMVCo.
+   - Gunakan `Exception('Pesan Bahasa Indonesia')` untuk validasi transaksi, autentikasi, PIN, limit, dan penukaran FinPoin di layer service.
 2. **Graceful Degradation pada Jaringan (Offline-Safe)**:
-   - Panggilan HTTP ke Firebase Firestore dan Midtrans Sandbox wajib memiliki `connectionTimeout` (5–6 detik) dan dibungkus `try / catch (_)`.
-   - Kegagalan jaringan pada sinkronisasi background **tidak boleh menghentikan alur aplikasi**; gunakan fallback state lokal atau simulator sandbox agar fitur tetap berjalan mulus saat offline maupun saat unit testing.
-3. **Penanganan Error di Layer UI**:
-   - Bungkus pemanggilan async service di UI dengan `try / on CustomException catch (e) / catch (e)`.
-   - Selalu periksa `if (!mounted) return;` (atau `if (!context.mounted) return;`) setelah setiap `await` sebelum memanggil `setState`, `Navigator`, atau `ScaffoldMessenger`.
-   - Tampilkan pesan error yang bersih ke pengguna menggunakan `SnackBar`:
-     ```dart
-     ScaffoldMessenger.of(context).showSnackBar(
-       SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-     );
-     ```
+   - Panggilan HTTP menggunakan `.timeout(const Duration(seconds: 6))` (atau `connectionTimeout`) di dalam blok `try / catch (_)`.
+   - Kegagalan jaringan tidak boleh menghentikan aplikasi; state lokal tetap berjalan dan menyediakan fallback aman.
+3. **Anti-Crash UI & Layout Safety**:
+   - Selalu periksa `if (!mounted) return;` setelah setiap `await` sebelum memanggil `setState`, `Navigator`, atau `ScaffoldMessenger`.
+   - Hindari pembagian dengan nol (`NaN`) dan `Expanded(flex: 0)` saat saldo atau arus kas pengguna baru bernilai `0` (bukti: penjagaan `if (filledFlex > 0)` di `finpay/lib/shared/widgets/rounded_progress_bar.dart` dan `totalFlow <= 0` di `finpay/lib/features/history/widgets/monthly_summary_card.dart`).
 
 ---
 
-## 6. Standar UI/UX, Layout, & Navigasi
+## 6. Standar Pengujian (Testing)
 
-- **Design Tokens Wajib**:
-  - Jangan melakukan *hardcode* warna, ukuran font, atau radius bila sudah tersedia di `AppColors`, `AppTextStyles`, `AppSpacing`, `AppRadius`, `AppSizes`, dan `AppShadows`.
-  - Gunakan `.withValues(alpha: ...)` (standar Flutter terbaru) alih-alih `.withOpacity(...)` yang sudah deprecated.
-- **Format Mata Uang & Nomor Referensi**:
-  - Selalu format nilai uang dengan `CurrencyFormatter.rupiah(nominal, withSign: ...)` — jangan memformat string `"Rp ..."` secara manual.
-  - Nomor referensi transaksi menggunakan format `FPX-...` (mis. `FPX-QR...` untuk QRIS, `FPX-SV...` untuk Tabungan, `FPX-LN...` untuk Pinjaman).
-- **Responsive Mobile Constraint**:
-  - Seluruh halaman mobile harus dibungkus dengan `Center` + `ConstrainedBox(constraints: const BoxConstraints(maxWidth: AppSizes.maxContentWidth))` (`480px`) agar tampilan tetap proporsional saat dijalankan di Web atau Tablet.
-  - Gunakan `SubPageScaffold` untuk sub-halaman agar header, tombol kembali, dan batas lebar konsisten.
-- **Pola Navigasi**:
-  - Navigasi antar layanan menggunakan `ServiceNavigationHelper` atau `AccountNavigationHelper` (dengan transisi `SlideTransition` + `FadeTransition` berdurasi `320ms`), atau melalui modal bottom sheet terpusat di `FinancialActionSheets`.
-  - Setiap aksi transaksi finansial yang sukses wajib menampilkan struk digital (`showFinPayReceiptDialog` atau `showQrisReceipt`).
+- File pengujian berada di `finpay/test/`:
+  - `finpay/test/wallet_service_test.dart`
+  - `finpay/test/qris_model_test.dart`
+  - `finpay/test/pidi_services_test.dart`
+  - `finpay/test/widget_test.dart`
+- Saat menulis unit test untuk service yang terhubung ke Firestore, kosongkan `FirebaseFirestoreConfig.projectId = ''` pada `setUp()` dan kembalikan ke `'finpay-app-4026a'` pada `tearDown()`.
 
 ---
 
-## 7. Standar Pengujian (Testing)
+## 7. Catatan Keterbatasan Audit (Limitations Note)
 
-- Setiap penambahan logika bisnis di `data/models/` atau `data/services/` harus disertai unit test di folder `test/`.
-- Saat menulis unit test untuk service yang terhubung ke Firestore (seperti pada `test/wallet_service_test.dart`):
-  - Kosongkan `FirebaseFirestoreConfig.projectId = ''` di dalam `setUp()` untuk menonaktifkan panggilan jaringan selama tes.
-  - Kembalikan nilai saldo `DummyData` dan `projectId` ke kondisi semula di dalam `tearDown()`.
+Sebagai bentuk transparansi audit anti-halusinasi, berikut adalah folder dan area yang **tidak diperiksa secara mendalam per baris kode** atau memiliki keterbatasan arsitektural saat ini:
+1. **Folder Platform Native & Build Artifacts**: Folder `finpay/android/`, `finpay/ios/`, `finpay/web/`, `finpay/build/`, dan `finpay/.dart_tool/` tidak diaudit isi file konfigurasi native-nya (seperti `build.gradle`, `AndroidManifest.xml`, `Info.plist`, atau `index.html`) karena dikecualikan pada `finpay/analysis_options.yaml` dan merupakan boilerplate standar Flutter.
+2. **Sub-Halaman Statis Sekunder di `features/account/pages/`**: Beberapa halaman informasi statis seperti `about_app_page.dart`, `devices_page.dart`, `help_center_page.dart`, `language_settings_page.dart`, `legal_page.dart`, `legal_terms_page.dart`, `notifications_settings_page.dart`, `profile_detail_page.dart`, `security_settings_page.dart`, dan `theme_settings_page.dart` hanya dipindai keberadaannya dan tidak dimodifikasi pada siklus pengembangan layanan finansial utama.
+3. **Arsitektur Serverless Client-to-Firestore**: Proyek ini adalah aplikasi Flutter *client-side* tanpa server backend terpisah (seperti Node.js/Go). Oleh karena itu, "layer backend" diwakili oleh kelas-kelas `*Service` di `finpay/lib/data/services/` yang berkomunikasi langsung ke REST API Firebase Firestore dan Midtrans Sandbox.

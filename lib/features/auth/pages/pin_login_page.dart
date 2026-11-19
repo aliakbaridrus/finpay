@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../data/services/auth_service.dart';
 import '../../main/main_page.dart';
 import '../data/auth_repository.dart';
 import '../widgets/auth_banner.dart';
@@ -35,6 +36,7 @@ class _PinLoginPageState extends State<PinLoginPage> {
   String _pin = '';
   String? _error;
   int _shake = 0;
+  bool _loading = false;
   Duration? _lockRemaining;
   Timer? _lockTimer;
 
@@ -98,7 +100,7 @@ class _PinLoginPageState extends State<PinLoginPage> {
   }
 
   void _onDigit(String digit) {
-    if (_pin.length >= _length || _locked) return;
+    if (_loading || _pin.length >= _length || _locked) return;
     setState(() {
       _pin += digit;
       _error = null;
@@ -111,15 +113,25 @@ class _PinLoginPageState extends State<PinLoginPage> {
   }
 
   void _onBackspace() {
-    if (_pin.isEmpty) return;
+    if (_loading || _pin.isEmpty) return;
     setState(() => _pin = _pin.substring(0, _pin.length - 1));
   }
 
-  void _verify() {
+  Future<void> _verify() async {
+    if (_loading) return;
     final result = authRepository.loginRemembered(_pin);
 
     switch (result.status) {
       case LoginStatus.success:
+        setState(() => _loading = true);
+        final acc = result.account;
+        if (acc != null) {
+          await AuthService.instance.loginWithIdentifier(
+            identifier: acc.email,
+            secret: acc.pin,
+          );
+          if (!mounted) return;
+        }
         _goHome();
       case LoginStatus.locked:
         HapticFeedback.heavyImpact();
@@ -138,10 +150,19 @@ class _PinLoginPageState extends State<PinLoginPage> {
   }
 
   Future<void> _biometric() async {
-    if (_locked) return;
+    if (_locked || _loading) return;
     final ok = await showBiometricSheet(context, title: 'Masuk ke FinPay');
     if (!ok || !mounted) return;
-    if (authRepository.signInRemembered() != null) _goHome();
+    final acc = authRepository.signInRemembered();
+    if (acc != null) {
+      setState(() => _loading = true);
+      await AuthService.instance.loginWithIdentifier(
+        identifier: acc.email,
+        secret: acc.pin,
+      );
+      if (!mounted) return;
+      _goHome();
+    }
   }
 
   void _switchAccount() {
@@ -198,7 +219,7 @@ class _PinLoginPageState extends State<PinLoginPage> {
         PinKeypad(
           onDigit: _onDigit,
           onBackspace: _onBackspace,
-          enabled: !_locked,
+          enabled: !_locked && !_loading,
         ),
         const SizedBox(height: AppSpacing.sm),
         Row(

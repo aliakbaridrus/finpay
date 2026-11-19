@@ -8,6 +8,7 @@ import '../models/linked_account_model.dart';
 import '../models/transaction_model.dart';
 import '../models/user_profile_model.dart';
 import '../models/wealth_models.dart';
+import '../../features/auth/data/auth_repository.dart';
 import 'account_service.dart';
 import 'transaction_service.dart';
 import 'wallet_service.dart';
@@ -396,6 +397,121 @@ class AuthService {
     );
   }
 
+  String _normalizePhoneDigits(String raw) {
+    var digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('62')) {
+      digits = digits.substring(2);
+    } else if (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    return digits;
+  }
+
+  /// Login lintas identifier (Nomor HP atau Email) menggunakan PIN 6 digit atau Password.
+  /// Digunakan oleh UI `features/auth/pages/login_page.dart` & `pin_login_page.dart`
+  /// agar terintegrasi penuh dengan Firebase Firestore (`users`, `wallets`, `transactions`).
+  Future<UserProfileModel?> loginWithIdentifier({
+    required String identifier,
+    required String secret,
+  }) async {
+    final cleanId = identifier.trim();
+    if (cleanId.isEmpty || secret.trim().length < 6) return null;
+
+    // Pastikan cache _initialReza* sudah terinisialisasi sebelum mutasi
+    final _ = _initialRezaTransactions.length +
+        _initialRezaAccounts.length +
+        _initialRezaGoals.length +
+        _initialRezaLoans.length;
+
+    final isEmail = cleanId.contains('@');
+    UserProfileModel? matchedProfile;
+    String? storedPassword;
+
+    if (isEmail) {
+      final lower = cleanId.toLowerCase();
+      final local = _localUsers[lower];
+      if (local != null) {
+        matchedProfile = local.profile;
+        storedPassword = local.password;
+      } else {
+        matchedProfile = await AccountService.instance
+            .findUserByEmailFromFirestore(lower);
+        storedPassword = matchedProfile?.password;
+      }
+    } else {
+      final normPhone = _normalizePhoneDigits(cleanId);
+      for (final entry in _localUsers.values) {
+        if (_normalizePhoneDigits(entry.profile.phoneNumber) == normPhone) {
+          matchedProfile = entry.profile;
+          storedPassword = entry.password;
+          break;
+        }
+      }
+      if (matchedProfile == null) {
+        matchedProfile = await AccountService.instance
+            .findUserByPhoneFromFirestore(normPhone);
+        storedPassword = matchedProfile?.password;
+      }
+    }
+
+    if (matchedProfile == null) return null;
+
+    final cleanSecret = secret.trim();
+    final pinMatches = matchedProfile.pin == cleanSecret;
+    final passwordMatches =
+        (storedPassword != null && storedPassword == cleanSecret) ||
+            matchedProfile.password == cleanSecret;
+
+    if (!pinMatches && !passwordMatches) {
+      return null;
+    }
+
+    _localUsers[matchedProfile.email.toLowerCase()] = (
+      password: storedPassword ?? matchedProfile.password,
+      profile: matchedProfile,
+    );
+
+    final restored = await _restoreExistingUserSession(matchedProfile);
+    _applyActiveUser(restored);
+    _saveCurrentSessionSnapshot();
+    if (restored.userId == 'finpay_user_01') {
+      await _seedAllPidiCollections();
+    } else {
+      await AccountService.instance.syncUserProfileToFirestore(restored);
+    }
+    return restored;
+  }
+
+  /// Sinkronisasi pemulihan PIN (Forgot PIN) ke profil `users` di Firestore.
+  Future<void> resetPinByPhone({
+    required String phone,
+    required String newPin,
+  }) async {
+    final normPhone = _normalizePhoneDigits(phone);
+    UserProfileModel? target;
+    for (final entry in _localUsers.values) {
+      if (_normalizePhoneDigits(entry.profile.phoneNumber) == normPhone) {
+        target = entry.profile;
+        break;
+      }
+    }
+    target ??=
+        await AccountService.instance.findUserByPhoneFromFirestore(normPhone);
+    if (target == null) return;
+
+    final updated = target.copyWith(pin: newPin, updatedAt: DateTime.now());
+    final emailKey = updated.email.toLowerCase();
+    final existing = _localUsers[emailKey];
+    _localUsers[emailKey] = (
+      password: existing?.password ?? updated.password,
+      profile: updated,
+    );
+    if (currentUser.userId == updated.userId) {
+      _updateCurrentUserState(updated);
+    }
+    await AccountService.instance.syncUserProfileToFirestore(updated);
+  }
+
   /// Registrasi pengguna baru:
   /// 1. Validasi seluruh data diri (Nama, NIK, Tanggal Lahir, Alamat/Lokasi, Email, HP, Password, PIN)
   /// 2. Validasi Kode Referral Teman (opsional): jika valid, beri +500 FinPoin untuk pengajak & pengguna baru
@@ -586,9 +702,10 @@ class AuthService {
     await WealthService.instance.seedInitialWealthDataToFirestore();
   }
 
-  /// Keluar dari sesi akun saat ini, menyimpan snapshot data terakhir user, & kembali ke halaman Login.
+  /// Keluar dari sesi akun saat ini, menyimpan snapshot data terakhir user, & kembali ke SplashPage -> Login/Register.
   Future<void> logout() async {
     _saveCurrentSessionSnapshot();
+    authRepository.logout();
     isLoggedInNotifier.value = false;
   }
 

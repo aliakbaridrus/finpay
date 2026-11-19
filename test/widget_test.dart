@@ -12,20 +12,36 @@ void main() {
     AuthService.instance.isLoggedInNotifier.value = true;
   });
 
-  testWidgets('Halaman Login muncul saat belum login dan masuk ke Beranda setelah login', (tester) async {
+  testWidgets(
+      'Splash muncul saat belum login lalu lanjut Onboarding -> Login -> Beranda',
+      (tester) async {
     AuthService.instance.isLoggedInNotifier.value = false;
 
     await tester.pumpWidget(const FinPayApp());
     await tester.pump();
 
-    expect(find.text('FinPay Digital Wallet'), findsOneWidget);
-    expect(find.text('Masuk ke FinPay'), findsOneWidget);
+    // SplashPage tampil terlebih dahulu
+    expect(find.text('FinPay'), findsOneWidget);
+
+    // Tunggu transisi otomatis SplashPage (1800ms) menuju OnboardingPage
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Saya sudah punya akun'), findsOneWidget);
+    await tester.tap(find.text('Saya sudah punya akun'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Selamat datang kembali'), findsOneWidget);
+
+    // Pindah ke tab Email lalu login sebagai Reza Pratama
+    await tester.tap(find.text('Email'));
+    await tester.pumpAndSettle();
 
     final textFields = find.byType(TextField);
     await tester.enterText(textFields.at(0), 'reza.pratama@email.com');
-    await tester.enterText(textFields.at(1), 'password123');
-    await tester.ensureVisible(find.text('Masuk ke FinPay'));
-    await tester.tap(find.text('Masuk ke FinPay'));
+    await tester.enterText(textFields.at(1), '123456');
+    await tester.ensureVisible(find.text('Masuk'));
+    await tester.tap(find.text('Masuk'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Halo, Reza Pratama'), findsOneWidget);

@@ -120,6 +120,8 @@ class _AccountPageState extends State<AccountPage> {
 
     if (confirmed == true && mounted) {
       await AuthService.instance.logout();
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     }
   }
 

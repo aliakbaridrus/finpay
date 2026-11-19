@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../data/services/auth_service.dart';
 import '../../main/main_page.dart';
 import '../data/auth_repository.dart';
 import '../utils/auth_validators.dart';
@@ -155,13 +156,52 @@ class _LoginPageState extends State<LoginPage> {
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
 
-    // DEMO: pura-pura menunggu respons server.
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-
     final identifier = _phoneMode
         ? AuthValidators.normalizePhone(_idController.text)
-        : _idController.text;
+        : _idController.text.trim();
+
+    // Cek status kunci anti brute-force lebih dulu.
+    final lockLeft = authRepository.lockRemainingFor(identifier);
+    if (lockLeft != null) {
+      HapticFeedback.heavyImpact();
+      _startLock(lockLeft);
+      return;
+    }
+
+    // 1. Coba autentikasi terhadap AuthService & Firebase Firestore.
+    final user = await AuthService.instance.loginWithIdentifier(
+      identifier: identifier,
+      secret: _pwController.text,
+    );
+    if (!mounted) return;
+
+    if (user != null) {
+      // Sinkronkan juga ke authRepository agar "Ingat akun saya" & biometrik tetap aktif.
+      final normPhone = AuthValidators.normalizePhone(user.phoneNumber);
+      if (normPhone.isNotEmpty && !authRepository.phoneExists(normPhone)) {
+        try {
+          authRepository.register(
+            name: user.fullName,
+            phone: normPhone,
+            email: user.email,
+            pin: user.pin,
+          );
+        } on StateError {
+          // Sudah tersimpan di memori.
+        }
+      }
+      if (normPhone.isNotEmpty) {
+        authRepository.login(
+          identifier: normPhone,
+          secret: user.pin,
+          remember: _remember,
+        );
+      }
+      _goHome();
+      return;
+    }
+
+    // 2. Fallback ke authRepository lokal (sekaligus menghitung batas percobaan salah).
     final result = authRepository.login(
       identifier: identifier,
       secret: _pwController.text,
@@ -170,6 +210,14 @@ class _LoginPageState extends State<LoginPage> {
 
     switch (result.status) {
       case LoginStatus.success:
+        final acc = result.account;
+        if (acc != null) {
+          await AuthService.instance.loginWithIdentifier(
+            identifier: acc.email,
+            secret: acc.pin,
+          );
+          if (!mounted) return;
+        }
         _goHome();
       case LoginStatus.locked:
         HapticFeedback.heavyImpact();
@@ -204,7 +252,15 @@ class _LoginPageState extends State<LoginPage> {
     }
     final ok = await showBiometricSheet(context, title: 'Masuk ke FinPay');
     if (!ok || !mounted) return;
-    if (authRepository.signInRemembered() != null) _goHome();
+    final acc = authRepository.signInRemembered();
+    if (acc != null) {
+      await AuthService.instance.loginWithIdentifier(
+        identifier: acc.email,
+        secret: acc.pin,
+      );
+      if (!mounted) return;
+      _goHome();
+    }
   }
 
   void _comingSoon(String label) {

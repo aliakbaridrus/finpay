@@ -8,7 +8,9 @@ class AuthFlowArgs {
     required this.purpose,
     required this.phone,
     this.name,
+    this.nik,
     this.email,
+    this.address,
     this.birthDate,
     this.referral,
   });
@@ -18,7 +20,9 @@ class AuthFlowArgs {
   /// Nomor HP ternormalisasi, mis. "81234567890".
   final String phone;
   final String? name;
+  final String? nik;
   final String? email;
+  final String? address;
   final DateTime? birthDate;
   final String? referral;
 }

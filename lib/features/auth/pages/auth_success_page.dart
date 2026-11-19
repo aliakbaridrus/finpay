@@ -138,8 +138,8 @@ class AuthSuccessPage extends StatelessWidget {
                         const SizedBox(height: AppSpacing.xxs),
                         Text(
                           args.referral == null
-                              ? 'Kamu dapat 100 FinPoin untuk transaksi pertama.'
-                              : 'Kode ${args.referral} diterapkan. Kamu dapat 600 FinPoin!',
+                              ? 'Akun barumu aktif dengan saldo awal Rp 0. Top up untuk mulai bertransaksi.'
+                              : 'Kode ${args.referral} diterapkan. Kamu & temanmu dapat bonus +500 FinPoin!',
                           style: AppTextStyles.caption,
                         ),
                       ],

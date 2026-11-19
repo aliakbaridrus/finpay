@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../data/services/auth_service.dart';
 import '../../main/main_page.dart';
 import '../auth_config.dart';
 import '../data/auth_repository.dart';
@@ -32,7 +33,9 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Widget _target() {
-    if (AuthConfig.skipToHome || authRepository.currentAccount != null) {
+    if (AuthConfig.skipToHome ||
+        AuthService.instance.isLoggedIn ||
+        authRepository.currentAccount != null) {
       return const MainPage();
     }
     if (authRepository.rememberedAccount != null) return const PinLoginPage();

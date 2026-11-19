@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
@@ -33,8 +34,10 @@ class _RegisterPageState extends State<RegisterPage> {
   ];
 
   final TextEditingController _name = TextEditingController();
+  final TextEditingController _nik = TextEditingController();
   final TextEditingController _phone = TextEditingController();
   final TextEditingController _email = TextEditingController();
+  final TextEditingController _address = TextEditingController();
   final TextEditingController _birth = TextEditingController();
   final TextEditingController _referral = TextEditingController();
 
@@ -42,16 +45,20 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _agree = false;
 
   String? _nameError;
+  String? _nikError;
   String? _phoneError;
   String? _emailError;
+  String? _addressError;
   String? _birthError;
   String? _referralError;
 
   @override
   void dispose() {
     _name.dispose();
+    _nik.dispose();
     _phone.dispose();
     _email.dispose();
+    _address.dispose();
     _birth.dispose();
     _referral.dispose();
     super.dispose();
@@ -79,8 +86,14 @@ class _RegisterPageState extends State<RegisterPage> {
 
   bool _validate() {
     final nameError = AuthValidators.name(_name.text);
+    final cleanNik = _nik.text.replaceAll(RegExp(r'\D'), '');
+    final nikError =
+        cleanNik.length != 16 ? 'NIK KTP wajib diisi 16 digit angka.' : null;
     var phoneError = AuthValidators.phone(_phone.text);
     final emailError = AuthValidators.email(_email.text);
+    final addressError = _address.text.trim().isEmpty
+        ? 'Alamat / lokasi tempat tinggal wajib diisi.'
+        : null;
     final birthError = AuthValidators.birthDate(_birthDate);
     final referralError = AuthValidators.referral(_referral.text);
 
@@ -90,15 +103,19 @@ class _RegisterPageState extends State<RegisterPage> {
 
     setState(() {
       _nameError = nameError;
+      _nikError = nikError;
       _phoneError = phoneError;
       _emailError = emailError;
+      _addressError = addressError;
       _birthError = birthError;
       _referralError = referralError;
     });
 
     return nameError == null &&
+        nikError == null &&
         phoneError == null &&
         emailError == null &&
+        addressError == null &&
         birthError == null &&
         referralError == null;
   }
@@ -114,7 +131,9 @@ class _RegisterPageState extends State<RegisterPage> {
             purpose: AuthPurpose.register,
             phone: AuthValidators.normalizePhone(_phone.text),
             name: _name.text.trim(),
+            nik: _nik.text.replaceAll(RegExp(r'\D'), ''),
             email: _email.text.trim(),
+            address: _address.text.trim(),
             birthDate: _birthDate,
             referral: referral.isEmpty ? null : referral,
           ),
@@ -151,6 +170,17 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         const SizedBox(height: AppSpacing.md),
         AuthTextField(
+          label: 'NIK KTP (16 Digit)',
+          hint: '3201234567890001',
+          controller: _nik,
+          keyboardType: TextInputType.number,
+          maxLength: 16,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          errorText: _nikError,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AuthTextField(
           label: 'Nomor HP',
           hint: '812-3456-7890',
           controller: _phone,
@@ -170,6 +200,15 @@ class _RegisterPageState extends State<RegisterPage> {
           controller: _email,
           keyboardType: TextInputType.emailAddress,
           errorText: _emailError,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AuthTextField(
+          label: 'Alamat / Lokasi Tempat Tinggal',
+          hint: 'Contoh: Jl. Sudirman No. 12, Jakarta',
+          controller: _address,
+          errorText: _addressError,
+          textCapitalization: TextCapitalization.sentences,
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: AppSpacing.md),
