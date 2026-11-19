@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'core/theme/app_theme.dart';
+import 'features/auth/pages/splash_page.dart';
 import 'data/services/auth_service.dart';
 import 'features/admin/admin_dashboard_page.dart';
 import 'features/auth/login_page.dart';
@@ -40,6 +41,7 @@ class FinPayApp extends StatelessWidget {
           child: child!,
         );
       },
+      home: const SplashPage(),
       // Secara default membuka AuthGate (Login/Register terlebih dahulu, lalu MainPage; kembali ke Login saat Logout).
       initialRoute: '/',
       routes: {
