@@ -4,21 +4,15 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../data/dummy/dummy_data.dart';
+import '../../../data/models/linked_account_model.dart';
+import '../../../data/models/user_profile_model.dart';
+import '../../../data/services/account_service.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/icon_box.dart';
 import '../../../shared/widgets/pill_badge.dart';
 import '../widgets/sub_page_scaffold.dart';
 
-class _BankAccount {
-  _BankAccount({required this.bank, required this.last4, this.isPrimary = false});
-
-  final String bank;
-  final String last4;
-  bool isPrimary;
-}
-
-/// Rekening & Kartu: kartu virtual FinPay + daftar rekening bank terhubung.
+/// Rekening & Kartu terintegrasi [AccountService] & koleksi `linked_accounts` (Bagian Tugas Pidi).
 class CardsPage extends StatefulWidget {
   const CardsPage({super.key});
 
@@ -28,13 +22,6 @@ class CardsPage extends StatefulWidget {
 
 class _CardsPageState extends State<CardsPage> {
   bool _numberVisible = false;
-  bool _frozen = false;
-  bool _onlineOn = true;
-
-  final List<_BankAccount> _accounts = [
-    _BankAccount(bank: 'BCA', last4: '4821', isPrimary: true),
-    _BankAccount(bank: 'Mandiri', last4: '7733'),
-  ];
 
   void _snack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -42,31 +29,26 @@ class _CardsPageState extends State<CardsPage> {
     );
   }
 
-  void _makePrimary(_BankAccount account) {
-    setState(() {
-      for (final item in _accounts) {
-        item.isPrimary = identical(item, account);
-      }
-    });
-    _snack('${account.bank} dijadikan rekening utama');
+  Future<void> _makePrimary(LinkedAccountModel account) async {
+    await AccountService.instance.setPrimaryLinkedAccount(account.id);
+    if (!mounted) return;
+    _snack('${account.bankName} dijadikan rekening utama');
   }
 
-  void _remove(_BankAccount account) {
-    if (_accounts.length == 1) {
-      _snack('Minimal harus ada satu rekening terhubung');
-      return;
+  Future<void> _remove(LinkedAccountModel account) async {
+    try {
+      await AccountService.instance.removeLinkedAccount(account.id);
+      if (!mounted) return;
+      _snack('Rekening ${account.bankName} dihapus');
+    } catch (e) {
+      if (!mounted) return;
+      _snack(e.toString().replaceFirst('Exception: ', ''));
     }
-    setState(() {
-      _accounts.remove(account);
-      if (!_accounts.any((a) => a.isPrimary)) {
-        _accounts.first.isPrimary = true;
-      }
-    });
-    _snack('Rekening ${account.bank} dihapus');
   }
 
   Future<void> _addAccount() async {
-    final result = await showModalBottomSheet<_BankAccount>(
+    final result =
+        await showModalBottomSheet<({String bank, String accountNumber})>(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
@@ -79,90 +61,117 @@ class _CardsPageState extends State<CardsPage> {
     );
 
     if (result != null && mounted) {
-      setState(() => _accounts.add(result));
-      _snack('Rekening ${result.bank} ditambahkan');
+      try {
+        final added = await AccountService.instance.addLinkedAccount(
+          bankName: result.bank,
+          accountNumber: result.accountNumber,
+        );
+        if (!mounted) return;
+        _snack(
+          'Rekening ${added.bankName} (•••• ${added.last4}) berhasil ditambahkan',
+        );
+      } catch (e) {
+        if (!mounted) return;
+        _snack(e.toString().replaceFirst('Exception: ', ''));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return SubPageScaffold(
-      title: 'Rekening & Kartu',
-      children: [
-        _VirtualCard(
-          visible: _numberVisible,
-          frozen: _frozen,
-          onToggleVisible: () =>
-              setState(() => _numberVisible = !_numberVisible),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        AppCard(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          child: Column(
-            children: [
-              _SwitchRow(
-                icon: Icons.ac_unit_rounded,
-                title: 'Bekukan Kartu',
-                subtitle: 'Blokir semua transaksi kartu sementara',
-                value: _frozen,
-                onChanged: (v) => setState(() => _frozen = v),
-              ),
-              const Divider(
-                height: 1,
-                indent: AppSpacing.lg + AppSizes.transactionIconBox + AppSpacing.md,
-                color: AppColors.border,
-              ),
-              _SwitchRow(
-                icon: Icons.public_rounded,
-                title: 'Transaksi Online',
-                subtitle: 'Izinkan pembayaran di merchant online',
-                value: _onlineOn,
-                onChanged: (v) => setState(() => _onlineOn = v),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.section),
-        Text('Rekening Terhubung', style: AppTextStyles.h2),
-        const SizedBox(height: AppSpacing.md),
-        AppCard(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-          child: Column(
-            children: [
-              for (var i = 0; i < _accounts.length; i++) ...[
-                _buildAccountRow(_accounts[i]),
-                if (i != _accounts.length - 1)
-                  const Divider(
-                    height: 1,
-                    indent: AppSpacing.lg +
-                        AppSizes.transactionIconBox +
-                        AppSpacing.md,
-                    color: AppColors.border,
+    return ValueListenableBuilder<UserProfileModel>(
+      valueListenable: AccountService.instance.userNotifier,
+      builder: (context, user, _) {
+        return ValueListenableBuilder<List<LinkedAccountModel>>(
+          valueListenable: AccountService.instance.linkedAccountsNotifier,
+          builder: (context, accounts, __) {
+            return SubPageScaffold(
+              title: 'Rekening & Kartu',
+              children: [
+                _VirtualCard(
+                  holderName: user.fullName,
+                  visible: _numberVisible,
+                  frozen: user.virtualCardFrozen,
+                  onToggleVisible: () =>
+                      setState(() => _numberVisible = !_numberVisible),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  child: Column(
+                    children: [
+                      _SwitchRow(
+                        icon: Icons.ac_unit_rounded,
+                        title: 'Bekukan Kartu',
+                        subtitle: 'Blokir semua transaksi kartu sementara',
+                        value: user.virtualCardFrozen,
+                        onChanged: (v) => AccountService.instance
+                            .updatePreferences(virtualCardFrozen: v),
+                      ),
+                      const Divider(
+                        height: 1,
+                        indent: AppSpacing.lg +
+                            AppSizes.transactionIconBox +
+                            AppSpacing.md,
+                        color: AppColors.border,
+                      ),
+                      _SwitchRow(
+                        icon: Icons.public_rounded,
+                        title: 'Transaksi Online',
+                        subtitle: 'Izinkan pembayaran di merchant online',
+                        value: user.virtualCardOnlineEnabled,
+                        onChanged: (v) => AccountService.instance
+                            .updatePreferences(virtualCardOnlineEnabled: v),
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: AppSpacing.section),
+                Text('Rekening Terhubung', style: AppTextStyles.h2),
+                const SizedBox(height: AppSpacing.md),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < accounts.length; i++) ...[
+                        _buildAccountRow(accounts[i]),
+                        if (i != accounts.length - 1)
+                          const Divider(
+                            height: 1,
+                            indent: AppSpacing.lg +
+                                AppSizes.transactionIconBox +
+                                AppSpacing.md,
+                            color: AppColors.border,
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                OutlinedButton.icon(
+                  onPressed: _addAccount,
+                  icon: const Icon(Icons.add_rounded, size: AppSizes.iconMd),
+                  label: Text(
+                    'Tambah Rekening',
+                    style: AppTextStyles.bodyLarge
+                        .copyWith(color: AppColors.primary),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    minimumSize: const Size.fromHeight(52),
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(borderRadius: AppRadius.lgAll),
+                  ),
+                ),
               ],
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton.icon(
-          onPressed: _addAccount,
-          icon: const Icon(Icons.add_rounded, size: AppSizes.iconMd),
-          label: Text(
-            'Tambah Rekening',
-            style: AppTextStyles.bodyLarge.copyWith(color: AppColors.primary),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.primary,
-            minimumSize: const Size.fromHeight(52),
-            side: const BorderSide(color: AppColors.primary),
-            shape: RoundedRectangleBorder(borderRadius: AppRadius.lgAll),
-          ),
-        ),
-      ],
+            );
+          },
+        );
+      },
     );
   }
 
-  Widget _buildAccountRow(_BankAccount account) {
+  Widget _buildAccountRow(LinkedAccountModel account) {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.lg,
@@ -180,11 +189,14 @@ class _CardsPageState extends State<CardsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${account.bank} •••• ${account.last4}',
+                  account.maskedTitle,
                   style: AppTextStyles.bodyLarge,
                 ),
                 const SizedBox(height: AppSpacing.xxs),
-                Text('a.n. ${DummyData.userName}', style: AppTextStyles.caption),
+                Text(
+                  'a.n. ${account.holderName}',
+                  style: AppTextStyles.caption,
+                ),
               ],
             ),
           ),
@@ -229,11 +241,13 @@ class _CardsPageState extends State<CardsPage> {
 /// kartu dibekukan.
 class _VirtualCard extends StatelessWidget {
   const _VirtualCard({
+    required this.holderName,
     required this.visible,
     required this.frozen,
     required this.onToggleVisible,
   });
 
+  final String holderName;
   final bool visible;
   final bool frozen;
   final VoidCallback onToggleVisible;
@@ -333,7 +347,7 @@ class _VirtualCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            DummyData.userName.toUpperCase(),
+                            holderName.toUpperCase(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppTextStyles.label.copyWith(
@@ -420,7 +434,7 @@ class _SwitchRow extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Colors.white,
+            activeThumbColor: Colors.white,
             activeTrackColor: AppColors.primary,
           ),
         ],
@@ -519,11 +533,7 @@ class _AddAccountSheetState extends State<_AddAccountSheet> {
                 onPressed: _valid
                     ? () => Navigator.pop(
                           context,
-                          _BankAccount(
-                            bank: _bank,
-                            last4: _controller.text
-                                .substring(_controller.text.length - 4),
-                          ),
+                          (bank: _bank, accountNumber: _controller.text),
                         )
                     : null,
                 style: ElevatedButton.styleFrom(

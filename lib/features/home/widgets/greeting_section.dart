@@ -12,11 +12,15 @@ class GreetingSection extends StatelessWidget {
     required this.userName,
     required this.membership,
     required this.points,
+    this.onSupportTap,
+    this.onMembershipTap,
   });
 
   final String userName;
   final String membership;
   final int points;
+  final VoidCallback? onSupportTap;
+  final VoidCallback? onMembershipTap;
 
   String get _formattedPoints {
     final s = points.toString();
@@ -46,11 +50,21 @@ class GreetingSection extends StatelessWidget {
                 runSpacing: AppSpacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  PillBadge(
-                    label: membership,
-                    leadingIcon: Icons.workspace_premium_rounded,
-                    backgroundColor: AppColors.goldLight,
-                    foregroundColor: const Color(0xFF92400E),
+                  GestureDetector(
+                    onTap: onMembershipTap ??
+                        () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Member $membership • $points FinPoin Aktif'),
+                            ),
+                          );
+                        },
+                    child: PillBadge(
+                      label: membership,
+                      leadingIcon: Icons.workspace_premium_rounded,
+                      backgroundColor: AppColors.goldLight,
+                      foregroundColor: const Color(0xFF92400E),
+                    ),
                   ),
                   Text(
                     '• $_formattedPoints FinPoin',
@@ -66,7 +80,14 @@ class GreetingSection extends StatelessWidget {
           color: AppColors.primaryLight,
           shape: const CircleBorder(),
           child: InkWell(
-            onTap: () {},
+            onTap: onSupportTap ??
+                () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Membuka Bantuan FinCare CS 24/7...'),
+                    ),
+                  );
+                },
             customBorder: const CircleBorder(),
             child: const SizedBox(
               width: 40,

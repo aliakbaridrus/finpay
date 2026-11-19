@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/models/menu_item_data.dart';
+import '../../features/services/service_navigation_helper.dart';
 import 'icon_box.dart';
 
 /// Ikon menu + label + badge opsional.
@@ -28,7 +29,13 @@ class MenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap ?? () {},
+      onTap: () {
+        if (onTap != null) {
+          onTap!();
+        } else {
+          ServiceNavigationHelper.openService(context, item.label);
+        }
+      },
       borderRadius: AppRadius.mdAll,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
@@ -56,7 +63,8 @@ class MenuTile extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               item.label,
-              style: labelStyle ?? AppTextStyles.caption.copyWith(
+              style: labelStyle ??
+                  AppTextStyles.caption.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
@@ -118,6 +126,7 @@ class MenuGrid extends StatelessWidget {
     this.rowSpacing = AppSpacing.md,
     this.boxSize = AppSizes.serviceIconBox,
     this.iconSize = AppSizes.iconMd,
+    this.onItemTap,
   });
 
   final List<MenuItemData> items;
@@ -125,6 +134,7 @@ class MenuGrid extends StatelessWidget {
   final double rowSpacing;
   final double boxSize;
   final double iconSize;
+  final void Function(MenuItemData item)? onItemTap;
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +155,9 @@ class MenuGrid extends StatelessWidget {
                         item: items[index],
                         boxSize: boxSize,
                         iconSize: iconSize,
+                        onTap: onItemTap != null
+                            ? () => onItemTap!(items[index])
+                            : null,
                       )
                     : const SizedBox.shrink(),
               );

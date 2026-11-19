@@ -4,6 +4,14 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/dummy/dummy_data.dart';
+import '../../data/models/user_profile_model.dart';
+import '../../data/models/wallet_model.dart';
+import '../../data/services/account_service.dart';
+import '../../data/services/transaction_service.dart';
+import '../../data/services/wallet_service.dart';
+import '../../data/services/wealth_service.dart';
+import '../account/widgets/redeem_poin_sheet.dart';
+import '../services/service_navigation_helper.dart';
 import 'widgets/balance_card.dart';
 import 'widgets/cash_flow_card.dart';
 import 'widgets/financial_services_section.dart';
@@ -15,83 +23,149 @@ import 'widgets/saving_goal_card.dart';
 import 'widgets/security_info_card.dart';
 import 'widgets/transaction_history_section.dart';
 
-/// Halaman Beranda FinPay.
-///
-/// Setiap section dipisah menjadi widget tersendiri di folder `widgets/`
-/// sehingga urutan, jarak, maupun isi section mudah diatur dari sini.
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+/// Halaman Beranda FinPay terintegrasi WalletService & TransactionService (Bagian Ali).
+class HomePage extends StatefulWidget {
+  const HomePage({super.key, this.onNavigateToHistory});
+
+  final VoidCallback? onNavigateToHistory;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    WalletService.instance.updateBalance();
+  }
+
+  void _refresh() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: AppSizes.maxContentWidth,
-          ),
-          child: CustomScrollView(
-            slivers: [
-              const SliverPadding(
-                padding: EdgeInsets.fromLTRB(
-                  AppSpacing.page,
-                  AppSpacing.sm,
-                  AppSpacing.page,
-                  0,
+    return ValueListenableBuilder<WalletModel>(
+      valueListenable: WalletService.instance.walletNotifier,
+      builder: (context, wallet, _) {
+        return ValueListenableBuilder(
+          valueListenable: TransactionService.instance.transactionsNotifier,
+          builder: (context, transactions, __) {
+            return SafeArea(
+              bottom: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppSizes.maxContentWidth,
+                  ),
+                  child: CustomScrollView(
+                    slivers: [
+                      const SliverPadding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpacing.page,
+                          AppSpacing.sm,
+                          AppSpacing.page,
+                          0,
+                        ),
+                        sliver: SliverToBoxAdapter(child: HomeHeader()),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.page,
+                          AppSpacing.md,
+                          AppSpacing.page,
+                          AppSpacing.xxxl,
+                        ),
+                        sliver: SliverList.list(
+                          children: _buildSections(wallet, transactions),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                sliver: SliverToBoxAdapter(child: HomeHeader()),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.page,
-                  AppSpacing.md,
-                  AppSpacing.page,
-                  AppSpacing.xxxl,
-                ),
-                sliver: SliverList.list(children: _buildSections()),
-              ),
-            ],
-          ),
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
-  List<Widget> _buildSections() {
+  List<Widget> _buildSections(
+    WalletModel wallet,
+    List<dynamic> transactions,
+  ) {
     return [
-      const GreetingSection(
-        userName: DummyData.userName,
-        membership: DummyData.membership,
-        points: DummyData.finPoin,
+      ValueListenableBuilder<UserProfileModel>(
+        valueListenable: AccountService.instance.userNotifier,
+        builder: (context, user, _) {
+          return GreetingSection(
+            userName: user.fullName,
+            membership: user.membership,
+            points: user.finPoin,
+            onMembershipTap: () => showRedeemPoinSheet(context),
+          );
+        },
       ),
       const SizedBox(height: AppSpacing.lg),
-      const BalanceCard(
-        totalBalance: DummyData.totalBalance,
-        cashBalance: DummyData.cashBalance,
-        savingBalance: DummyData.savingBalance,
+      BalanceCard(
+        totalBalance: wallet.totalWealth,
+        cashBalance: wallet.cashBalance,
+        savingBalance: wallet.savingBalance,
         phoneNumber: DummyData.phoneNumber,
       ),
       const SizedBox(height: AppSpacing.lg),
-      const QuickActions(items: DummyData.quickActions),
+      QuickActions(
+        items: DummyData.quickActions,
+        onItemTap: (item) {
+          ServiceNavigationHelper.openService(
+            context,
+            item.label,
+            onStateChanged: _refresh,
+          );
+        },
+      ),
       const SizedBox(height: AppSpacing.section),
-      const FinancialServicesSection(items: DummyData.services),
+      FinancialServicesSection(
+        items: DummyData.services,
+        onItemTap: (item) {
+          ServiceNavigationHelper.openService(
+            context,
+            item.label,
+            onStateChanged: _refresh,
+          );
+        },
+      ),
       const SizedBox(height: AppSpacing.section),
       _buildHighlightsSection(),
       const SizedBox(height: AppSpacing.lg),
-      const InstantLoanBanner(
+      InstantLoanBanner(
         maxAmount: DummyData.loanMaxAmount,
         minInstallment: DummyData.loanMinInstallment,
         interestLabel: DummyData.loanInterest,
+        onApplyTap: () {
+          ServiceNavigationHelper.openService(
+            context,
+            'Pinjaman',
+            onStateChanged: _refresh,
+          );
+        },
       ),
       const SizedBox(height: AppSpacing.section),
-      const TransactionHistorySection(transactions: DummyData.transactions),
+      TransactionHistorySection(
+        transactions: DummyData.transactions,
+        onSeeAllTap: widget.onNavigateToHistory,
+      ),
       const SizedBox(height: AppSpacing.section),
       const SecurityInfoCard(),
     ];
   }
 
   Widget _buildHighlightsSection() {
+    final summary = WealthService.instance.calculateCashFlowSummary();
+    final firstGoal = WealthService.instance.savingGoals.firstOrNull;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -101,7 +175,7 @@ class HomePage extends StatelessWidget {
               child: Text('Sorotan Keuangan', style: AppTextStyles.h2),
             ),
             Text(
-              DummyData.highlightPeriod,
+              summary.period,
               style: AppTextStyles.caption.copyWith(
                 color: AppColors.textTertiary,
               ),
@@ -109,19 +183,37 @@ class HomePage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        const CashFlowCard(
-          income: DummyData.monthlyIncome,
-          expense: DummyData.monthlyExpense,
-          incomeNote: DummyData.incomeGrowth,
-          expenseNote: DummyData.expenseNote,
+        GestureDetector(
+          onTap: () {
+            ServiceNavigationHelper.openService(
+              context,
+              'Cash Flow',
+              onStateChanged: _refresh,
+            );
+          },
+          child: CashFlowCard(
+            income: summary.totalIncome,
+            expense: summary.totalExpense,
+            incomeNote: summary.incomeGrowthLabel,
+            expenseNote: summary.expenseRatioLabel,
+          ),
         ),
         const SizedBox(height: AppSpacing.md),
-        const SavingGoalCard(
-          title: DummyData.savingGoalTitle,
-          monthlyDebit: DummyData.savingGoalMonthly,
-          current: DummyData.savingGoalCurrent,
-          target: DummyData.savingGoalTarget,
-          eta: DummyData.savingGoalEta,
+        GestureDetector(
+          onTap: () {
+            ServiceNavigationHelper.openService(
+              context,
+              'Menabung',
+              onStateChanged: _refresh,
+            );
+          },
+          child: SavingGoalCard(
+            title: firstGoal?.title ?? 'Belum Ada Target Menabung',
+            monthlyDebit: firstGoal?.monthlyDebit ?? 0,
+            current: firstGoal?.currentAmount ?? 0,
+            target: firstGoal?.targetAmount ?? 1,
+            eta: firstGoal?.eta ?? '-',
+          ),
         ),
       ],
     );

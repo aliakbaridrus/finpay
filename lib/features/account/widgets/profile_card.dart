@@ -20,6 +20,7 @@ class ProfileCard extends StatelessWidget {
     required this.nextTierName,
     required this.nextTierPoints,
     this.onEditTap,
+    this.onRedeemPoinTap,
   });
 
   final String userName;
@@ -31,6 +32,7 @@ class ProfileCard extends StatelessWidget {
   final String nextTierName;
   final int nextTierPoints;
   final VoidCallback? onEditTap;
+  final VoidCallback? onRedeemPoinTap;
 
   /// "Reza Pratama" -> "RP"
   String get _initials {
@@ -213,7 +215,11 @@ class ProfileCard extends StatelessWidget {
           IntrinsicHeight(
             child: Row(
               children: [
-                _Stat(value: _thousands(points), label: 'FinPoin'),
+                _Stat(
+                  value: _thousands(points),
+                  label: 'FinPoin (Tukar)',
+                  onTap: onRedeemPoinTap,
+                ),
                 _divider(),
                 _Stat(value: '$transactionCount', label: 'Transaksi bln ini'),
                 _divider(),
@@ -226,19 +232,35 @@ class ProfileCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Menuju $nextTierName',
+                  remaining <= 0
+                      ? 'Level Tertinggi ($membership) 🌟'
+                      : 'Menuju $nextTierName',
                   style: AppTextStyles.caption.copyWith(
                     color: Colors.white.withValues(alpha: 0.85),
                   ),
                 ),
               ),
-              Text(
-                '${_thousands(remaining)} poin lagi',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.mint,
-                  fontWeight: FontWeight.w700,
+              if (onRedeemPoinTap != null)
+                GestureDetector(
+                  onTap: onRedeemPoinTap,
+                  child: Text(
+                    remaining <= 0
+                        ? 'Tukar Poin →'
+                        : '${_thousands(remaining)} poin lagi • Tukar →',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.mint,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  '${_thousands(remaining)} poin lagi',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.mint,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -261,38 +283,43 @@ class ProfileCard extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label});
+  const _Stat({required this.value, required this.label, this.onTap});
 
   final String value;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Column(
-        children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.smAll,
+        child: Column(
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: AppTextStyles.caption.copyWith(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 10,
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption.copyWith(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 10,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
