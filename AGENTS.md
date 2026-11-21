@@ -14,7 +14,7 @@ Dokumen ini merupakan acuan arsitektur perangkat lunak, standar kode, dan pola p
     - *Named records* `({Type a, Type b})` (`finpay/lib/data/services/wallet_service.dart`, `finpay/lib/data/services/account_service.dart`, `finpay/lib/data/services/wealth_service.dart`).
 - **Dependencies Utama** (`finpay/pubspec.yaml`):
   - `google_fonts: ^6.3.3` — Tipografi berbasis font **Plus Jakarta Sans** (`finpay/lib/core/theme/app_text_styles.dart`).
-  - `http: ^1.6.0` — Klien HTTP lintas platform (Web/Chrome, Android, Desktop) untuk REST API Firebase Firestore & Firebase Auth (`finpay/lib/data/services/auth_service.dart`, `finpay/lib/data/services/account_service.dart`, `finpay/lib/data/services/wealth_service.dart`, `finpay/lib/data/services/wallet_service.dart`, `finpay/lib/data/services/transaction_service.dart`).
+  - `http: ^1.6.0` — Klien HTTP lintas platform (Web/Chrome, Android, Desktop) untuk REST API Firebase Firestore, Firebase Auth, & Midtrans Sandbox (`finpay/lib/data/services/auth_service.dart`, `finpay/lib/data/services/account_service.dart`, `finpay/lib/data/services/wealth_service.dart`, `finpay/lib/data/services/wallet_service.dart`, `finpay/lib/data/services/transaction_service.dart`, `finpay/lib/data/services/midtrans_service.dart`, `finpay/lib/data/services/support_chat_service.dart`).
   - `qr_flutter: ^4.1.0` — Rendering QR Code standar EMVCo QRIS (`finpay/lib/shared/widgets/qris_code_card.dart`).
 - **Dev Dependencies & Linter** (`finpay/pubspec.yaml` & `finpay/analysis_options.yaml`):
   - `flutter_test` (SDK) & `flutter_lints: ^4.0.0` dengan aturan aktif:
@@ -24,7 +24,7 @@ Dokumen ini merupakan acuan arsitektur perangkat lunak, standar kode, dan pola p
 - **Integrasi Eksternal & Engine Internal**:
   - **Firebase Cloud Firestore REST API**: Sinkronisasi 9 koleksi (`wallets`, `transactions`, `midtrans_orders`, `support_chats`, `users`, `linked_accounts`, `saving_goals`, `loans`, `promos`) ke endpoint `https://firestore.googleapis.com/v1/projects/finpay-app-4026a/databases/(default)/documents` (`finpay/lib/data/services/transaction_service.dart`).
   - **Firebase Auth REST API**: Login & Register Email/Password ke endpoint `identitytoolkit.googleapis.com` dengan fallback autentikasi Firestore/lokal (`finpay/lib/data/services/auth_service.dart`).
-  - **Midtrans Sandbox API**: Pembuatan Snap Token (`POST /snap/v1/transactions`) dan cek status (`GET /v2/{orderId}/status`) menggunakan `dart:io` (`HttpClient`) dengan fallback simulator lokal (`finpay/lib/data/services/midtrans_service.dart`).
+  - **Midtrans Sandbox API**: Pembuatan Snap Token (`POST /snap/v1/transactions`), cek status (`GET /v2/{orderId}/status`), serta sinkronisasi `midtrans_orders` menggunakan `package:http/http.dart` lintas platform dengan fallback simulator lokal (`finpay/lib/data/services/midtrans_service.dart`).
   - **Standar EMVCo QRIS Engine**: Parser & encoder payload TLV (*Tag-Length-Value*) beserta kalkulasi checksum `CRC16/CCITT-FALSE` mandiri (`finpay/lib/data/models/qris_model.dart`).
   - **Pure Dart PDF 1.4 Engine**: Pembuat dokumen e-Statement `.pdf` murni beserta pengunduh lintas platform (`finpay/lib/core/utils/pdf_statement_generator.dart`, `pdf_downloader_web.dart`, `pdf_downloader_io.dart`, `pdf_downloader_stub.dart`).
 
@@ -89,7 +89,7 @@ finpay/
 ### B. Gaya Bahasa & Kutipan
 - **Single Quotes**: Wajib menggunakan kutipan tunggal (`'...'`) untuk semua string sesuai `finpay/analysis_options.yaml`.
 - **Immutability & `const`**:
-  - Field pada Model dan Widget menggunakan `final` (dengan metode `copyWith` untuk pembaruan state pada `WalletModel`, `UserProfileModel`, `LinkedAccountModel`, `SavingGoalModel`, `LoanModel`, `PromoModel`).
+  - Field pada Model dan Widget menggunakan `final` (dengan metode `copyWith` untuk pembaruan state pada `WalletModel`, `UserProfileModel`, `LinkedAccountModel`, `SavingGoalModel`, `LoanModel`, `PromoModel`, `SupportMessageModel`, `MidtransOrderResult`).
   - Gunakan `const` pada konstruktor widget dan deklarasi elemen statis.
 - **Bahasa Komentar & UI**:
   - Teks antarmuka pengguna (UI), pesan `Exception`, dan komentar dokumentasi (`///`) ditulis dalam **Bahasa Indonesia**.
@@ -114,6 +114,7 @@ Proyek ini **tidak menggunakan package state management eksternal** (seperti Blo
      - `WalletService.instance.walletNotifier` (`finpay/lib/data/services/wallet_service.dart`)
      - `TransactionService.instance.transactionsNotifier` (`finpay/lib/data/services/transaction_service.dart`)
      - `WealthService.instance.savingGoalsNotifier`, `activeLoansNotifier`, & `promosNotifier` (`finpay/lib/data/services/wealth_service.dart`)
+     - `MidtransService.instance.ordersNotifier` (`finpay/lib/data/services/midtrans_service.dart`)
      - `SupportChatService.instance.messagesNotifier` (`finpay/lib/data/services/support_chat_service.dart`)
    - UI mendengarkan perubahan state menggunakan `ValueListenableBuilder<T>`.
 2. **Isolasi Sesi Multi-User & Sinkronisasi Firestore**:
@@ -144,6 +145,7 @@ Proyek ini **tidak menggunakan package state management eksternal** (seperti Blo
 - File pengujian berada di `finpay/test/`:
   - `finpay/test/wallet_service_test.dart`
   - `finpay/test/qris_model_test.dart`
+  - `finpay/test/support_and_midtrans_service_test.dart`
   - `finpay/test/pidi_services_test.dart`
   - `finpay/test/widget_test.dart`
 - Saat menulis unit test untuk service yang terhubung ke Firestore, kosongkan `FirebaseFirestoreConfig.projectId = ''` pada `setUp()` dan kembalikan ke `'finpay-app-4026a'` pada `tearDown()`.
