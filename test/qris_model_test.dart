@@ -1,7 +1,11 @@
 import 'package:finpay/data/models/qris_model.dart';
+import 'package:finpay/features/pay/pay_page.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
+  setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
   const merchant = QrisPayload(
     merchantName: 'Kopi Kenangan Sudirman',
     merchantCity: 'Jakarta',
@@ -85,5 +89,78 @@ void main() {
         throwsA(isA<QrisFormatException>()),
       );
     });
+  });
+
+  group('PayPage Scan QRIS UI & Flow Tests', () {
+    testWidgets(
+      'PayPage menampilkan Scan QRIS, QRIS SUPPORTED, Metode QRIS Lainnya (Bayar & Transfer tanpa Tap)',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: PayPage(),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('Scan QRIS'), findsOneWidget);
+        expect(find.text('SUPPORTED'), findsOneWidget);
+        expect(find.text('Metode QRIS Lainnya'), findsOneWidget);
+        expect(find.text('Bayar'), findsOneWidget);
+        expect(find.text('Transfer'), findsOneWidget);
+        expect(find.text('Tap'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Ketuk Bayar meminta PIN 6 digit lalu menampilkan Kode QRIS Bayar (CPM)',
+      (tester) async {
+        tester.view.physicalSize = const Size(430, 1200);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: PayPage(),
+          ),
+        );
+        await tester.pump();
+
+        await tester.tap(find.text('Bayar'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Masukkan PIN FinPay'), findsOneWidget);
+
+        // Masukkan PIN default 123456
+        for (final digit in ['1', '2', '3', '4', '5', '6']) {
+          await tester.tap(find.text(digit));
+          await tester.pump();
+        }
+        await tester.pumpAndSettle();
+
+        expect(find.text('Kode QRIS Bayar (CPM)'), findsOneWidget);
+        expect(find.text('PIN Terverifikasi'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Ketuk Transfer langsung menampilkan halaman QRIS Saya milik pengguna',
+      (tester) async {
+        tester.view.physicalSize = const Size(430, 1200);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: PayPage(),
+          ),
+        );
+        await tester.pump();
+
+        await tester.tap(find.text('Transfer'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('QRIS Saya'), findsOneWidget);
+      },
+    );
   });
 }
