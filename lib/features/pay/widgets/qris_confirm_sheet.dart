@@ -7,6 +7,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../data/dummy/dummy_data.dart';
 import '../../../data/models/qris_model.dart';
 import '../../../data/services/qris_service.dart';
+import 'qris_pin_sheet.dart';
 
 /// Menampilkan konfirmasi pembayaran QRIS. Mengembalikan nominal yang
 /// disetujui pengguna, atau `null` jika dibatalkan.
@@ -65,6 +66,17 @@ class _QrisConfirmSheetState extends State<_QrisConfirmSheet> {
     } on QrisFormatException catch (e) {
       return e.message;
     }
+  }
+
+  Future<void> _confirmWithPin(int amount, int total) async {
+    final verified = await showQrisPinSheet(
+      context,
+      title: 'PIN Pembayaran QRIS',
+      subtitle:
+          'Konfirmasi pembayaran ${CurrencyFormatter.rupiah(total)} ke ${widget.payload.merchantName}',
+    );
+    if (!verified || !mounted) return;
+    Navigator.pop(context, amount);
   }
 
   @override
@@ -190,16 +202,22 @@ class _QrisConfirmSheetState extends State<_QrisConfirmSheet> {
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       flex: 2,
-                      child: ElevatedButton(
-                        onPressed:
-                            canPay ? () => Navigator.pop(context, amount) : null,
+                      child: ElevatedButton.icon(
+                        onPressed: canPay
+                            ? () => _confirmWithPin(amount, total)
+                            : null,
+                        icon: const Icon(
+                          Icons.lock_outline_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           minimumSize: const Size.fromHeight(52),
                           shape: const StadiumBorder(),
                         ),
-                        child: Text(
+                        label: Text(
                           amount == null
                               ? 'Bayar'
                               : 'Bayar ${CurrencyFormatter.rupiah(total)}',
