@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../data/dummy/dummy_data.dart';
 import '../../../data/models/support_chat_model.dart';
+import '../../../data/models/user_profile_model.dart';
+import '../../../data/services/account_service.dart';
 import '../../../data/services/support_chat_service.dart';
+import '../../../data/services/transaction_service.dart';
 import '../../../shared/widgets/pill_badge.dart';
 import '../widgets/sub_page_scaffold.dart';
 
@@ -27,11 +29,28 @@ class _ContactCsPageState extends State<ContactCsPage> {
 
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scroll = ScrollController();
-  final String _userId = 'finpay_user_01';
+
+  UserProfileModel get _activeUser => AccountService.instance.currentUser;
+
+  String get _activeUserId {
+    final uid = _activeUser.userId.trim();
+    return uid.isNotEmpty ? uid : FirebaseFirestoreConfig.defaultUserId;
+  }
 
   @override
   void initState() {
     super.initState();
+    SupportChatService.instance.ensureWelcomeMessageForUser(
+      userId: _activeUserId,
+      userName: _activeUser.fullName,
+    );
+    SupportChatService.instance.markMessagesAsRead(
+      _activeUserId,
+      readByAdmin: false,
+    );
+    SupportChatService.instance.fetchMessagesFromFirebase(
+      userId: _activeUserId,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToEnd());
   }
 
@@ -42,18 +61,20 @@ class _ContactCsPageState extends State<ContactCsPage> {
     super.dispose();
   }
 
-  void _send(String raw) {
+  Future<void> _send(String raw) async {
     final text = raw.trim();
     if (text.isEmpty) return;
 
-    SupportChatService.instance.sendMessage(
-      userId: _userId,
-      userName: DummyData.userName,
+    final userId = _activeUserId;
+    final userName = _activeUser.fullName;
+
+    _controller.clear();
+    await SupportChatService.instance.sendMessage(
+      userId: userId,
+      userName: userName,
       text: text,
       isFromAdmin: false,
     );
-
-    _controller.clear();
     _scrollToEnd();
   }
 
@@ -85,12 +106,22 @@ class _ContactCsPageState extends State<ContactCsPage> {
           ),
         ),
       ],
-      body: ValueListenableBuilder<List<SupportMessageModel>>(
-        valueListenable: SupportChatService.instance.messagesNotifier,
-        builder: (context, allMessages, _) {
-          final userMessages = allMessages
-              .where((m) => m.userId == _userId)
-              .toList();
+      body: ValueListenableBuilder<UserProfileModel>(
+        valueListenable: AccountService.instance.userNotifier,
+        builder: (context, user, _) {
+          final currentUid = user.userId.trim().isNotEmpty
+              ? user.userId.trim()
+              : FirebaseFirestoreConfig.defaultUserId;
+          SupportChatService.instance.ensureWelcomeMessageForUser(
+            userId: currentUid,
+            userName: user.fullName,
+          );
+
+          return ValueListenableBuilder<List<SupportMessageModel>>(
+            valueListenable: SupportChatService.instance.messagesNotifier,
+            builder: (context, allMessages, _) {
+              final userMessages = SupportChatService.instance
+                  .getMessagesForUser(currentUid);
 
           return Column(
             children: [
@@ -128,6 +159,8 @@ class _ContactCsPageState extends State<ContactCsPage> {
               ),
               _buildInputBar(),
             ],
+          );
+            },
           );
         },
       ),
