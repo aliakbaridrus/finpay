@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../dummy/dummy_data.dart';
 import '../models/support_chat_model.dart';
@@ -87,33 +87,26 @@ class SupportChatService {
     final current = List<SupportMessageModel>.from(messagesNotifier.value)..add(msg);
     messagesNotifier.value = current;
 
-    // Sync ke Firebase Firestore jika sudah terkoneksi
+    // Sync ke Firebase Firestore menggunakan package:http (kompatibel Web Chrome, Android, & Desktop)
     if (FirebaseFirestoreConfig.isConfigured) {
       try {
         final url = Uri.parse(
-          '${FirebaseFirestoreConfig.baseUrl}/support_chats?documentId=${msg.id}',
+          '${FirebaseFirestoreConfig.baseUrl}/support_chats/${msg.id}',
         );
-        final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-        final request = await client.postUrl(url);
-        request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-
         final payload = {
-          'fields': {
-            'id': {'stringValue': msg.id},
-            'userId': {'stringValue': msg.userId},
-            'userName': {'stringValue': msg.userName},
-            'text': {'stringValue': msg.text},
-            'isFromAdmin': {'booleanValue': msg.isFromAdmin},
-            'timestamp': {'stringValue': msg.timestamp.toIso8601String()},
-            'isRead': {'booleanValue': msg.isRead},
-          },
+          'fields': msg.toFirestoreFields(),
         };
 
-        request.write(jsonEncode(payload));
-        final response = await request.close();
-        await response.drain<void>();
-        client.close();
-      } catch (_) {}
+        await http
+            .patch(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(payload),
+            )
+            .timeout(const Duration(seconds: 6));
+      } catch (_) {
+        // Tetap aman menggunakan state lokal jika jaringan sedang offline.
+      }
     }
   }
 
