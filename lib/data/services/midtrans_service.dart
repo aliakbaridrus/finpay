@@ -1,6 +1,9 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
+import 'transaction_service.dart';
 
 /// Model respons dan order pembayaran Midtrans Sandbox untuk koleksi `midtrans_orders`.
 class MidtransOrderResult {
@@ -127,7 +130,9 @@ class MidtransOrderResult {
 /// Menangani pembuatan Snap Token (`POST /snap/v1/transactions`) dan
 /// pengecekan status pembayaran (`GET /v2/{order_id}/status`) di Midtrans Sandbox.
 class MidtransService {
-  MidtransService._();
+  MidtransService._() {
+    _seedInitialOrders();
+  }
   static final MidtransService instance = MidtransService._();
 
   /// Kredensial Midtrans Sandbox.
@@ -141,6 +146,67 @@ class MidtransService {
   static const String _apiSandboxBaseUrl = 'https://api.sandbox.midtrans.com/v2';
 
   final Map<String, MidtransOrderResult> _ordersCache = {};
+
+  /// Daftar order Midtrans reaktif untuk dipantau dari aplikasi maupun Admin Dashboard.
+  final ValueNotifier<List<MidtransOrderResult>> ordersNotifier =
+      ValueNotifier<List<MidtransOrderResult>>([]);
+
+  List<MidtransOrderResult> get orders => List<MidtransOrderResult>.unmodifiable(
+        ordersNotifier.value,
+      );
+
+  void _seedInitialOrders() {
+    final now = DateTime.now();
+    final initial = [
+      MidtransOrderResult(
+        orderId: 'FPX-90821231',
+        userId: 'finpay_user_01',
+        amount: 500000,
+        paymentMethod: 'BCA Virtual Account',
+        snapToken: 'sandbox-token-fpx-90821231',
+        redirectUrl:
+            'https://app.sandbox.midtrans.com/snap/v2/vtweb/FPX-90821231',
+        vaNumber: '88012 081234567890',
+        status: 'settlement',
+        createdAt: now.subtract(const Duration(hours: 2)),
+      ),
+      MidtransOrderResult(
+        orderId: 'FPX-90820012',
+        userId: 'finpay_user_01',
+        amount: 250000,
+        paymentMethod: 'Mandiri Virtual Account',
+        snapToken: 'sandbox-token-fpx-90820012',
+        redirectUrl:
+            'https://app.sandbox.midtrans.com/snap/v2/vtweb/FPX-90820012',
+        vaNumber: '88013 081299887766',
+        status: 'settlement',
+        createdAt: now.subtract(const Duration(hours: 6)),
+      ),
+      MidtransOrderResult(
+        orderId: 'FPX-90772100',
+        userId: 'finpay_user_01',
+        amount: 1000000,
+        paymentMethod: 'BRI Virtual Account (BRIVA)',
+        snapToken: 'sandbox-token-fpx-90772100',
+        redirectUrl:
+            'https://app.sandbox.midtrans.com/snap/v2/vtweb/FPX-90772100',
+        vaNumber: '88014 081234567890',
+        status: 'settlement',
+        createdAt: now.subtract(const Duration(days: 1)),
+      ),
+    ];
+
+    for (final order in initial) {
+      _ordersCache[order.orderId] = order;
+    }
+    _publishOrders();
+  }
+
+  void _publishOrders() {
+    final sorted = _ordersCache.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    ordersNotifier.value = sorted;
+  }
 
   /// Header Basic Auth standar Midtrans: `Basic base64(ServerKey + ":")`.
   String get _basicAuthHeader {
@@ -212,6 +278,7 @@ class MidtransService {
             createdAt: DateTime.now(),
           );
           _ordersCache[orderId] = result;
+          _publishOrders();
           return result;
         }
       } catch (_) {
@@ -232,6 +299,7 @@ class MidtransService {
       createdAt: DateTime.now(),
     );
     _ordersCache[orderId] = simulatedResult;
+    _publishOrders();
     return simulatedResult;
   }
 
@@ -254,7 +322,14 @@ class MidtransService {
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
-          return (data['transaction_status'] as String?) ?? 'settlement';
+          final resolvedStatus =
+              (data['transaction_status'] as String?) ?? 'settlement';
+          final existing = _ordersCache[orderId];
+          if (existing != null && existing.status != resolvedStatus) {
+            _ordersCache[orderId] = existing.copyWith(status: resolvedStatus);
+            _publishOrders();
+          }
+          return resolvedStatus;
         }
       } catch (_) {
         // Gunakan status cache lokal jika offline
@@ -262,6 +337,44 @@ class MidtransService {
     }
 
     return _ordersCache[orderId]?.status ?? 'settlement';
+  }
+
+  /// Mengambil daftar order Midtrans dari koleksi `midtrans_orders` di Firebase Firestore.
+  Future<List<MidtransOrderResult>> fetchOrdersFromFirebase({
+    String? userId,
+  }) async {
+    if (!FirebaseFirestoreConfig.isConfigured) {
+      return orders;
+    }
+
+    try {
+      final url =
+          Uri.parse('${FirebaseFirestoreConfig.baseUrl}/midtrans_orders');
+      final response = await http.get(url).timeout(const Duration(seconds: 6));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final documents = (decoded['documents'] as List<dynamic>?) ?? [];
+        for (final doc in documents) {
+          final docMap = doc as Map<String, dynamic>;
+          final fields = docMap['fields'] as Map<String, dynamic>?;
+          if (fields == null) continue;
+          final docName = (docMap['name'] as String?) ?? '';
+          final docId = docName.contains('/') ? docName.split('/').last : null;
+          final parsed = MidtransOrderResult.fromFirestoreFields(
+            fields,
+            docId: docId,
+          );
+          if (userId == null || userId.isEmpty || parsed.userId == userId) {
+            _ordersCache[parsed.orderId] = parsed;
+          }
+        }
+        _publishOrders();
+      }
+    } catch (_) {
+      // Tetap gunakan cache lokal jika koneksi sedang offline.
+    }
+
+    return orders;
   }
 
   String _generateVirtualAccount(String method, String phone) {
