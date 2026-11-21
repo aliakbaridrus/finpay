@@ -5,8 +5,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/dummy/dummy_data.dart';
 import '../../../data/models/qris_model.dart';
+import '../../../data/models/user_profile_model.dart';
+import '../../../data/services/account_service.dart';
 import '../../../data/services/qris_service.dart';
 import '../../../data/services/wallet_service.dart';
 import '../../../shared/widgets/qris_code_card.dart';
@@ -123,70 +124,76 @@ class _MyQrPageState extends State<MyQrPage> {
     return SubPageScaffold(
       title: 'QRIS Saya',
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: AppColors.balanceGradient,
-            borderRadius: AppRadius.xlAll,
-            boxShadow: AppShadows.glow(AppColors.primary),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Column(
-              children: [
-                Text(
-                  'Terima pembayaran ke',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: Colors.white.withValues(alpha: 0.8),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  DummyData.userName,
-                  style: AppTextStyles.h1.copyWith(color: Colors.white),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                if (needsAmount)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.xxl),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: AppRadius.xlAll,
+        ValueListenableBuilder<UserProfileModel>(
+          valueListenable: AccountService.instance.userNotifier,
+          builder: (context, user, _) {
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppColors.balanceGradient,
+                borderRadius: AppRadius.xlAll,
+                boxShadow: AppShadows.glow(AppColors.primary),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Column(
+                  children: [
+                    Text(
+                      'Terima / Transfer QRIS ke',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
                     ),
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.lock_outline_rounded,
-                          size: 48,
-                          color: AppColors.textTertiary,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Atur nominal untuk membuat QRIS dinamis',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.bodySmall,
-                        ),
-                      ],
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      user.fullName,
+                      style: AppTextStyles.h1.copyWith(color: Colors.white),
+                      textAlign: TextAlign.center,
                     ),
-                  )
-                else
-                  QrisCodeCard(
-                    data: payload.encode(),
-                    merchantName: payload.merchantName,
-                    nmid: payload.nmid,
-                    amount: payload.amount,
-                  ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  DummyData.phoneNumber,
-                  style: AppTextStyles.bodyLarge.copyWith(
-                    color: Colors.white,
-                    letterSpacing: 1.2,
-                  ),
+                    const SizedBox(height: AppSpacing.lg),
+                    if (needsAmount)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(AppSpacing.xxl),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: AppRadius.xlAll,
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 48,
+                              color: AppColors.textTertiary,
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              'Atur nominal untuk membuat QRIS dinamis',
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.bodySmall,
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      QrisCodeCard(
+                        data: payload.encode(),
+                        merchantName: user.fullName,
+                        nmid: payload.nmid,
+                        amount: payload.amount,
+                      ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      user.phoneNumber,
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
         const SizedBox(height: AppSpacing.lg),
         Row(
