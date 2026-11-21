@@ -164,19 +164,50 @@ class SupportChatService {
     }
   }
 
-  /// Menandai semua pesan dari user tertentu sebagai sudah dibaca (read) oleh Admin.
-  void markMessagesAsRead(String userId) {
+  /// Menambahkan pesan sapaan pembuka CS otomatis untuk user baru yang belum punya riwayat chat.
+  void ensureWelcomeMessageForUser({
+    required String userId,
+    required String userName,
+  }) {
+    final existing = messagesNotifier.value.any((m) => m.userId == userId);
+    if (existing) return;
+
+    final firstName = userName.trim().isEmpty
+        ? 'Kak'
+        : userName.trim().split(' ').first;
+    final welcome = SupportMessageModel(
+      id: 'msg_welcome_$userId',
+      userId: userId,
+      userName: 'Admin FinPay',
+      text:
+          'Halo Kak $firstName! 👋 Selamat datang di Layanan Live CS FinPay 24 Jam. Ada kendala Top Up, QRIS, Transfer, atau Akun yang bisa kami bantu?',
+      isFromAdmin: true,
+      timestamp: DateTime.now(),
+      isRead: true,
+    );
+
+    messagesNotifier.value = [
+      ...messagesNotifier.value,
+      welcome,
+    ];
+  }
+
+  /// Menghitung jumlah pesan yang belum dibaca untuk user tertentu.
+  /// - [forAdmin] = `true`: menghitung pesan dari user yang belum dibaca Admin.
+  /// - [forAdmin] = `false`: menghitung pesan dari Admin yang belum dibaca user.
+  int unreadCountForUser(String userId, {bool forAdmin = false}) {
+    return messagesNotifier.value.where((msg) {
+      if (msg.userId != userId || msg.isRead) return false;
+      return forAdmin ? !msg.isFromAdmin : msg.isFromAdmin;
+    }).length;
+  }
+
+  /// Menandai semua pesan untuk user tertentu sebagai sudah dibaca (read).
+  void markMessagesAsRead(String userId, {bool readByAdmin = true}) {
     final updated = messagesNotifier.value.map((msg) {
-      if (msg.userId == userId && !msg.isFromAdmin) {
-        return SupportMessageModel(
-          id: msg.id,
-          userId: msg.userId,
-          userName: msg.userName,
-          text: msg.text,
-          isFromAdmin: msg.isFromAdmin,
-          timestamp: msg.timestamp,
-          isRead: true,
-        );
+      final shouldMark = readByAdmin ? !msg.isFromAdmin : msg.isFromAdmin;
+      if (msg.userId == userId && shouldMark && !msg.isRead) {
+        return msg.copyWith(isRead: true);
       }
       return msg;
     }).toList();
