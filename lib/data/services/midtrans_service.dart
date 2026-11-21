@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:http/http.dart' as http;
 
 /// Model respons dan order pembayaran Midtrans Sandbox untuk koleksi `midtrans_orders`.
 class MidtransOrderResult {
@@ -165,13 +166,6 @@ class MidtransService {
 
     if (isRealSandboxKey) {
       try {
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 6);
-        final request = await client.postUrl(Uri.parse(_snapSandboxUrl));
-        request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-        request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-        request.headers.set(HttpHeaders.authorizationHeader, _basicAuthHeader);
-
         final payload = {
           'transaction_details': {
             'order_id': orderId,
@@ -191,13 +185,20 @@ class MidtransService {
           ],
         };
 
-        request.write(jsonEncode(payload));
-        final response = await request.close();
-        final responseBody = await response.transform(utf8.decoder).join();
-        client.close();
+        final response = await http
+            .post(
+              Uri.parse(_snapSandboxUrl),
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': _basicAuthHeader,
+              },
+              body: jsonEncode(payload),
+            )
+            .timeout(const Duration(seconds: 6));
 
         if (response.statusCode == 200 || response.statusCode == 201) {
-          final data = jsonDecode(responseBody) as Map<String, dynamic>;
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
           final result = MidtransOrderResult(
             orderId: orderId,
             userId: userId,
@@ -241,19 +242,18 @@ class MidtransService {
 
     if (isRealSandboxKey) {
       try {
-        final client = HttpClient()
-          ..connectionTimeout = const Duration(seconds: 6);
-        final request = await client
-            .getUrl(Uri.parse('$_apiSandboxBaseUrl/$orderId/status'));
-        request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-        request.headers.set(HttpHeaders.authorizationHeader, _basicAuthHeader);
-
-        final response = await request.close();
-        final body = await response.transform(utf8.decoder).join();
-        client.close();
+        final response = await http
+            .get(
+              Uri.parse('$_apiSandboxBaseUrl/$orderId/status'),
+              headers: {
+                'Accept': 'application/json',
+                'Authorization': _basicAuthHeader,
+              },
+            )
+            .timeout(const Duration(seconds: 6));
 
         if (response.statusCode == 200) {
-          final data = jsonDecode(body) as Map<String, dynamic>;
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
           return (data['transaction_status'] as String?) ?? 'settlement';
         }
       } catch (_) {
