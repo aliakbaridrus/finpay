@@ -1,3 +1,4 @@
+import 'package:finpay/core/theme/app_theme.dart';
 import 'package:finpay/data/models/qris_model.dart';
 import 'package:finpay/features/pay/pay_page.dart';
 import 'package:flutter/material.dart';
@@ -96,8 +97,9 @@ void main() {
       'PayPage menampilkan Scan QRIS, QRIS SUPPORTED, Metode QRIS Lainnya (Bayar & Transfer tanpa Tap)',
       (tester) async {
         await tester.pumpWidget(
-          const MaterialApp(
-            home: PayPage(),
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const PayPage(),
           ),
         );
         await tester.pump();
@@ -114,13 +116,14 @@ void main() {
     testWidgets(
       'Ketuk Bayar meminta PIN 6 digit lalu menampilkan Kode QRIS Bayar (CPM)',
       (tester) async {
-        tester.view.physicalSize = const Size(430, 1200);
+        tester.view.physicalSize = const Size(430, 1400);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
 
         await tester.pumpWidget(
-          const MaterialApp(
-            home: PayPage(),
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const PayPage(),
           ),
         );
         await tester.pump();
@@ -145,13 +148,14 @@ void main() {
     testWidgets(
       'Ketuk Transfer langsung menampilkan halaman QRIS Saya milik pengguna',
       (tester) async {
-        tester.view.physicalSize = const Size(430, 1200);
+        tester.view.physicalSize = const Size(430, 1400);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
 
         await tester.pumpWidget(
-          const MaterialApp(
-            home: PayPage(),
+          MaterialApp(
+            theme: AppTheme.light,
+            home: const PayPage(),
           ),
         );
         await tester.pump();

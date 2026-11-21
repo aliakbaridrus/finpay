@@ -67,9 +67,11 @@ class _QrisBayarCpmSheet extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Kode QRIS Bayar (CPM)', style: AppTextStyles.h2),
+                  Expanded(
+                    child: Text('Kode QRIS Bayar (CPM)', style: AppTextStyles.h2),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
                   const PillBadge(
                     label: 'PIN Terverifikasi',
                     leadingIcon: Icons.verified_user_rounded,
