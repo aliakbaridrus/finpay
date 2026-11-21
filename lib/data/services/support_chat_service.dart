@@ -62,9 +62,63 @@ class SupportChatService {
 
   /// Mengambil seluruh pesan untuk satu user tertentu.
   List<SupportMessageModel> getMessagesForUser(String userId) {
-    return messagesNotifier.value
+    final list = messagesNotifier.value
         .where((m) => m.userId == userId)
-        .toList();
+        .toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return list;
+  }
+
+  /// Mengambil riwayat pesan CS dari koleksi `support_chats` di Firebase Firestore.
+  Future<List<SupportMessageModel>> fetchMessagesFromFirebase({
+    String? userId,
+  }) async {
+    if (!FirebaseFirestoreConfig.isConfigured) {
+      return userId == null
+          ? messagesNotifier.value
+          : getMessagesForUser(userId);
+    }
+
+    try {
+      final url =
+          Uri.parse('${FirebaseFirestoreConfig.baseUrl}/support_chats');
+      final response = await http.get(url).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final documents = (decoded['documents'] as List<dynamic>?) ?? [];
+        if (documents.isNotEmpty) {
+          final byId = <String, SupportMessageModel>{
+            for (final existing in messagesNotifier.value)
+              existing.id: existing,
+          };
+
+          for (final doc in documents) {
+            final docMap = doc as Map<String, dynamic>;
+            final fields = docMap['fields'] as Map<String, dynamic>?;
+            if (fields == null) continue;
+            final docName = (docMap['name'] as String?) ?? '';
+            final docId =
+                docName.contains('/') ? docName.split('/').last : null;
+            final parsed = SupportMessageModel.fromFirestoreFields(
+              fields,
+              docId: docId,
+            );
+            byId[parsed.id] = parsed;
+          }
+
+          final merged = byId.values.toList()
+            ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          messagesNotifier.value = merged;
+        }
+      }
+    } catch (_) {
+      // Tetap gunakan daftar pesan lokal jika sedang offline.
+    }
+
+    return userId == null
+        ? messagesNotifier.value
+        : getMessagesForUser(userId);
   }
 
   /// Mengirim pesan baru (bisa dari User HP atau Admin Web).
