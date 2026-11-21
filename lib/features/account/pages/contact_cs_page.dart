@@ -168,6 +168,43 @@ class _ContactCsPageState extends State<ContactCsPage> {
 
           return Column(
             children: [
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(
+                  AppSpacing.page,
+                  AppSpacing.sm,
+                  AppSpacing.page,
+                  AppSpacing.xs,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: AppRadius.mdAll,
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.verified_user_rounded,
+                      color: AppColors.primary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        'Terhubung sebagai ${user.fullName} • ${user.phoneNumber}',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Expanded(
                 child: ListView.builder(
                   controller: _scroll,
@@ -331,14 +368,29 @@ class _Bubble extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    message.timeFormatted,
-                    style: AppTextStyles.caption.copyWith(
-                      color: fromUser
-                          ? Colors.white.withValues(alpha: 0.7)
-                          : AppColors.textTertiary,
-                      fontSize: 10,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        message.timeFormatted,
+                        style: AppTextStyles.caption.copyWith(
+                          color: fromUser
+                              ? Colors.white.withValues(alpha: 0.7)
+                              : AppColors.textTertiary,
+                          fontSize: 10,
+                        ),
+                      ),
+                      if (fromUser) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.done_all_rounded,
+                          size: 13,
+                          color: message.isRead
+                              ? AppColors.mint
+                              : Colors.white.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
