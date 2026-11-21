@@ -22,6 +22,7 @@ class ContactCsPage extends StatefulWidget {
 class _ContactCsPageState extends State<ContactCsPage> {
   static const List<String> _quickReplies = [
     'Top up belum masuk',
+    'Kendala pembayaran QRIS',
     'Kendala transfer antar bank',
     'Lupa PIN transaksi',
     'Pertanyaan limit harian',
@@ -29,6 +30,7 @@ class _ContactCsPageState extends State<ContactCsPage> {
 
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scroll = ScrollController();
+  bool _isSyncing = false;
 
   UserProfileModel get _activeUser => AccountService.instance.currentUser;
 
@@ -61,6 +63,27 @@ class _ContactCsPageState extends State<ContactCsPage> {
     super.dispose();
   }
 
+  Future<void> _refreshChats() async {
+    if (_isSyncing) return;
+    setState(() => _isSyncing = true);
+    await SupportChatService.instance.fetchMessagesFromFirebase(
+      userId: _activeUserId,
+    );
+    SupportChatService.instance.markMessagesAsRead(
+      _activeUserId,
+      readByAdmin: false,
+    );
+    if (!mounted) return;
+    setState(() => _isSyncing = false);
+    _scrollToEnd();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Riwayat chat Live CS berhasil disinkronkan.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _send(String raw) async {
     final text = raw.trim();
     if (text.isEmpty) return;
@@ -75,6 +98,18 @@ class _ContactCsPageState extends State<ContactCsPage> {
       text: text,
       isFromAdmin: false,
     );
+    _scrollToEnd();
+
+    await SupportChatService.instance.sendAutoReplyForUserMessage(
+      userId: userId,
+      userName: userName,
+      userText: text,
+    );
+    SupportChatService.instance.markMessagesAsRead(
+      userId,
+      readByAdmin: false,
+    );
+    if (!mounted) return;
     _scrollToEnd();
   }
 
@@ -93,8 +128,16 @@ class _ContactCsPageState extends State<ContactCsPage> {
   Widget build(BuildContext context) {
     return SubPageScaffold(
       title: 'Bantuan & Live CS',
-      actions: const [
-        Padding(
+      actions: [
+        IconButton(
+          onPressed: _isSyncing ? null : _refreshChats,
+          tooltip: 'Sinkronkan Chat Firestore',
+          icon: Icon(
+            Icons.sync_rounded,
+            color: _isSyncing ? AppColors.textTertiary : AppColors.primary,
+          ),
+        ),
+        const Padding(
           padding: EdgeInsets.only(right: AppSpacing.page),
           child: Center(
             child: PillBadge(
