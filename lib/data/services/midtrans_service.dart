@@ -27,6 +27,30 @@ class MidtransOrderResult {
 
   bool get isSettled => status == 'settlement' || status == 'capture';
 
+  MidtransOrderResult copyWith({
+    String? orderId,
+    String? userId,
+    int? amount,
+    String? paymentMethod,
+    String? snapToken,
+    String? redirectUrl,
+    String? vaNumber,
+    String? status,
+    DateTime? createdAt,
+  }) {
+    return MidtransOrderResult(
+      orderId: orderId ?? this.orderId,
+      userId: userId ?? this.userId,
+      amount: amount ?? this.amount,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      snapToken: snapToken ?? this.snapToken,
+      redirectUrl: redirectUrl ?? this.redirectUrl,
+      vaNumber: vaNumber ?? this.vaNumber,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'orderId': orderId,
@@ -39,6 +63,61 @@ class MidtransOrderResult {
       'status': status,
       'createdAt': createdAt.toIso8601String(),
     };
+  }
+
+  Map<String, dynamic> toFirestoreFields() {
+    return {
+      'orderId': {'stringValue': orderId},
+      'userId': {'stringValue': userId},
+      'amount': {'integerValue': amount.toString()},
+      'paymentType': {'stringValue': paymentMethod},
+      'snapToken': {'stringValue': snapToken},
+      'redirectUrl': {'stringValue': redirectUrl},
+      'vaNumber': {'stringValue': vaNumber},
+      'status': {'stringValue': status},
+      'createdAt': {'stringValue': createdAt.toIso8601String()},
+    };
+  }
+
+  factory MidtransOrderResult.fromFirestoreFields(
+    Map<String, dynamic> fields, {
+    String? docId,
+  }) {
+    String readStr(String key, [String fallback = '']) {
+      final raw = fields[key];
+      if (raw is Map<String, dynamic> && raw['stringValue'] != null) {
+        return raw['stringValue'].toString();
+      }
+      return fallback;
+    }
+
+    int readInt(String key, [int fallback = 0]) {
+      final raw = fields[key];
+      if (raw is Map<String, dynamic> && raw['integerValue'] != null) {
+        return int.tryParse(raw['integerValue'].toString()) ?? fallback;
+      }
+      return fallback;
+    }
+
+    final parsedOrderId = readStr('orderId', docId ?? 'FPX-00000000');
+    return MidtransOrderResult(
+      orderId: parsedOrderId,
+      userId: readStr('userId', 'finpay_user_01'),
+      amount: readInt('amount'),
+      paymentMethod: readStr('paymentType', 'BCA Virtual Account'),
+      snapToken: readStr(
+        'snapToken',
+        'sandbox-token-${parsedOrderId.toLowerCase()}',
+      ),
+      redirectUrl: readStr(
+        'redirectUrl',
+        'https://app.sandbox.midtrans.com/snap/v2/vtweb/$parsedOrderId',
+      ),
+      vaNumber: readStr('vaNumber', '88012 081234567890'),
+      status: readStr('status', 'settlement'),
+      createdAt:
+          DateTime.tryParse(readStr('createdAt')) ?? DateTime.now(),
+    );
   }
 }
 
