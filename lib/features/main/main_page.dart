@@ -53,7 +53,9 @@ class _MainPageState extends State<MainPage> {
           onNavigateToHistory: () => setState(() => _currentIndex = 1),
         ),
       1 => const HistoryPage(),
-      2 => const PayPage(),
+      2 => PayPage(
+          onBackTap: () => setState(() => _currentIndex = 0),
+        ),
       3 => const FinancePage(),
       4 => const AccountPage(),
       _ => Center(
