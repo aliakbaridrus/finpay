@@ -202,6 +202,70 @@ class SupportChatService {
     }).length;
   }
 
+  /// Membuat balasan cerdas CS berdasarkan topik pertanyaan pengguna.
+  String buildSmartAdminReply(String userText, {String? userName}) {
+    final lower = userText.toLowerCase();
+    final firstName = (userName == null || userName.trim().isEmpty)
+        ? 'Kak'
+        : userName.trim().split(' ').first;
+
+    if (lower.contains('top up') || lower.contains('isi saldo')) {
+      return 'Halo Kak $firstName! Untuk kendala Top Up Virtual Account / QRIS Midtrans, mohon lampirkan Order ID (FPX-...) agar tim kami segera menyinkronkan saldo kas Kakak.';
+    }
+    if (lower.contains('qris')) {
+      return 'Halo Kak $firstName! Pembayaran & Top Up QRIS FinPay diproses instan dengan standar EMVCo Bank Indonesia. Jika status masih pending, mohon kirimkan nomor referensi FPX-QR... ya.';
+    }
+    if (lower.contains('transfer') || lower.contains('bank')) {
+      return 'Halo Kak $firstName! Transfer sesama FinPay masuk detik itu juga, sedangkan transfer antar bank diproses real-time. Boleh infokan nomor referensi FPX-... transaksi Kakak?';
+    }
+    if (lower.contains('pin') || lower.contains('lupa')) {
+      return 'Halo Kak $firstName! Jika lupa PIN 6 digit, Kakak dapat melakukan reset PIN melalui menu Akun > Ubah PIN atau tombol Lupa PIN di halaman masuk.';
+    }
+    if (lower.contains('limit') || lower.contains('kyc')) {
+      return 'Halo Kak $firstName! Limit transaksi harian mengikuti tier akun dan status verifikasi KTP (KYC). Upgrade KYC ke Terverifikasi untuk limit hingga Rp 50.000.000/hari.';
+    }
+    return 'Terima kasih Kak $firstName, pesan Kakak sudah diterima oleh tim Live CS FinPay dan sedang kami tindak lanjuti.';
+  }
+
+  /// Mengirimkan balasan otomatis CS FinPay setelah pengguna mengirim pertanyaan.
+  Future<SupportMessageModel> sendAutoReplyForUserMessage({
+    required String userId,
+    required String userName,
+    required String userText,
+  }) async {
+    final replyText = buildSmartAdminReply(userText, userName: userName);
+    final replyMsg = SupportMessageModel(
+      id: 'msg_auto_${DateTime.now().millisecondsSinceEpoch}',
+      userId: userId,
+      userName: 'Admin FinPay',
+      text: replyText,
+      isFromAdmin: true,
+      timestamp: DateTime.now(),
+      isRead: false,
+    );
+
+    final current = List<SupportMessageModel>.from(messagesNotifier.value)
+      ..add(replyMsg);
+    messagesNotifier.value = current;
+
+    if (FirebaseFirestoreConfig.isConfigured) {
+      try {
+        final url = Uri.parse(
+          '${FirebaseFirestoreConfig.baseUrl}/support_chats/${replyMsg.id}',
+        );
+        await http
+            .patch(
+              url,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'fields': replyMsg.toFirestoreFields()}),
+            )
+            .timeout(const Duration(seconds: 6));
+      } catch (_) {}
+    }
+
+    return replyMsg;
+  }
+
   /// Menandai semua pesan untuk user tertentu sebagai sudah dibaca (read).
   void markMessagesAsRead(String userId, {bool readByAdmin = true}) {
     final updated = messagesNotifier.value.map((msg) {
