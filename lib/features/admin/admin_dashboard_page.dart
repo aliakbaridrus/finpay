@@ -1171,10 +1171,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         // Jendela Chat Aktif di Sebelah Kanan
         Expanded(
           child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: const BorderRadius.horizontal(right: Radius.circular(AppRadius.lg)),
-              border: const Border(
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius:
+                  BorderRadius.horizontal(right: Radius.circular(AppRadius.lg)),
+              border: Border(
                 top: BorderSide(color: AppColors.border),
                 right: BorderSide(color: AppColors.border),
                 bottom: BorderSide(color: AppColors.border),
@@ -1196,17 +1197,26 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   children: [
                     // Chat Header
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
                       decoration: const BoxDecoration(
                         color: Colors.white,
-                        border: Border(bottom: BorderSide(color: AppColors.border)),
+                        border: Border(
+                          bottom: BorderSide(color: AppColors.border),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          CircleAvatar(
+                          const CircleAvatar(
                             radius: 18,
                             backgroundColor: AppColors.primaryLight,
-                            child: const Icon(Icons.person, color: AppColors.primary, size: 20),
+                            child: Icon(
+                              Icons.person,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Column(

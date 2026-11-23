@@ -128,7 +128,7 @@ class _PayPageState extends State<PayPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isCameraActive = TickerMode.of(context);
+    final isCameraActive = TickerMode.valuesOf(context).enabled;
 
     return Scaffold(
       backgroundColor: const Color(0xFF1A1614),
