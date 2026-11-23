@@ -119,14 +119,20 @@ class _TransferPageState extends State<TransferPage>
       return;
     }
 
-    // Gunakan Midtrans Snap Simulator sebagai jembatan pembayaran transfer
-    final bridgeResult = await showMidtransSnapSimulator(
-      context,
-      merchantTitle: 'FinPay Transfer',
-      amount: amount,
-      recipientLabel: recipient,
-    );
-    if (bridgeResult == null || !mounted) return;
+    final isBankTransfer = _tabController.index == 1;
+    MidtransSnapBridgeResult? bridgeResult;
+
+    // Popup jembatan Midtrans Snap hanya untuk tab 'Ke Rekening Bank'.
+    // Untuk 'Ke Sesama FinPay', transfer langsung memotong FinPay Cash & masuk ke penerima.
+    if (isBankTransfer) {
+      bridgeResult = await showMidtransSnapSimulator(
+        context,
+        merchantTitle: 'FinPay Transfer Bank',
+        amount: amount,
+        recipientLabel: recipient,
+      );
+      if (bridgeResult == null || !mounted) return;
+    }
 
     final timeFormatted = TimeOfDay.now().format(context);
 
@@ -134,26 +140,31 @@ class _TransferPageState extends State<TransferPage>
       final trx = await WalletService.instance.transferMoney(
         recipient: recipient,
         amount: amount,
-        isBankTransfer: _tabController.index == 1,
+        isBankTransfer: isBankTransfer,
         timeFormatted: timeFormatted,
         note: _noteController.text,
-        midtransOrderId: bridgeResult.order.orderId,
-        midtransMethod: bridgeResult.paymentMethod,
+        midtransOrderId: bridgeResult?.order.orderId,
+        midtransMethod: bridgeResult?.paymentMethod,
       );
 
       if (!mounted) return;
 
       await showFinPayReceiptDialog(
         context,
-        title: 'Transfer via Midtrans Berhasil! 💸',
+        title: isBankTransfer
+            ? 'Transfer Bank via Midtrans Berhasil! 💸'
+            : 'Transfer Sesama FinPay Berhasil! 💸',
         amountText: CurrencyFormatter.rupiah(-amount, withSign: true),
         amountColor: AppColors.danger,
         referenceNumber: trx.referenceNumber,
         details: [
-          {'label': 'Order ID Midtrans', 'value': bridgeResult.order.orderId},
-          {'label': 'Metode Jembatan', 'value': bridgeResult.paymentMethod},
+          if (bridgeResult != null) ...[
+            {'label': 'Order ID Midtrans', 'value': bridgeResult.order.orderId},
+            {'label': 'Metode Jembatan', 'value': bridgeResult.paymentMethod},
+          ] else
+            {'label': 'Metode', 'value': 'FinPay Cash (Instan)'},
           {'label': 'Penerima', 'value': recipient},
-          {'label': 'Status', 'value': 'SETTLEMENT'},
+          {'label': 'Status', 'value': 'BERHASIL'},
           {
             'label': 'Sisa Saldo Cash',
             'value': CurrencyFormatter.rupiah(DummyData.cashBalance),
