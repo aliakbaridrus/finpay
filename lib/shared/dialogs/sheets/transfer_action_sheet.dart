@@ -60,13 +60,16 @@ class _TransferActionSheetState extends State<TransferActionSheet> {
     final nav = Navigator.of(context);
     final rootContext = nav.context;
 
-    final bridgeResult = await showMidtransSnapSimulator(
-      context,
-      merchantTitle: 'FinPay Transfer',
-      amount: amount,
-      recipientLabel: recipient,
-    );
-    if (bridgeResult == null || !mounted) return;
+    MidtransSnapBridgeResult? bridgeResult;
+    if (_isBankTransfer) {
+      bridgeResult = await showMidtransSnapSimulator(
+        context,
+        merchantTitle: 'FinPay Transfer Bank',
+        amount: amount,
+        recipientLabel: recipient,
+      );
+      if (bridgeResult == null || !mounted) return;
+    }
 
     setState(() => _isProcessing = true);
     try {
@@ -76,8 +79,8 @@ class _TransferActionSheetState extends State<TransferActionSheet> {
         isBankTransfer: _isBankTransfer,
         timeFormatted: timeFormatted,
         note: _noteController.text,
-        midtransOrderId: bridgeResult.order.orderId,
-        midtransMethod: bridgeResult.paymentMethod,
+        midtransOrderId: bridgeResult?.order.orderId,
+        midtransMethod: bridgeResult?.paymentMethod,
       );
       widget.onSuccess?.call();
       if (!mounted) return;
