@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../data/models/transaction_model.dart';
+import '../../data/services/account_service.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/transaction_service.dart';
 import '../../data/services/wealth_service.dart';
@@ -29,6 +30,19 @@ class _HistoryPageState extends State<HistoryPage> {
         ...WealthService.availablePeriods,
         'Pilih Rentang Tanggal (Kustom)',
       ];
+
+  @override
+  void initState() {
+    super.initState();
+    _syncHistoryFromFirestore();
+  }
+
+  Future<void> _syncHistoryFromFirestore() async {
+    await TransactionService.instance.fetchTransactionsFromFirebase(
+      userId: AccountService.instance.currentUser.userId,
+    );
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
@@ -167,8 +181,11 @@ class _HistoryPageState extends State<HistoryPage> {
               constraints: const BoxConstraints(
                 maxWidth: AppSizes.maxContentWidth,
               ),
-              child: CustomScrollView(
-                slivers: [
+              child: RefreshIndicator(
+                onRefresh: _syncHistoryFromFirestore,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
                   // Header & Search
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
@@ -236,6 +253,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     ),
                   ),
                 ],
+              ),
               ),
             ),
           ),
