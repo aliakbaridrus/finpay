@@ -135,15 +135,23 @@ class MidtransService {
   }
   static final MidtransService instance = MidtransService._();
 
-  /// Kredensial Midtrans Sandbox.
-  /// Ganti dengan Server Key & Client Key dari Dashboard Midtrans Sandbox kamu:
+  /// Kredensial Midtrans Sandbox (Merchant Finpay — aliidrus3142@gmail.com).
+  /// Kelola Access Keys di:
   /// https://dashboard.sandbox.midtrans.com/settings/config_info
-  static String serverKey = 'SB-Mid-server-FinPaySandboxKey2026';
+  static String serverKey = 'SB-Mid-server-HWaWdbmxEDTrykhhfX-PvE34';
   static String clientKey = 'SB-Mid-client-FinPaySandboxKey2026';
 
-  static const String _snapSandboxUrl =
-      'https://app.sandbox.midtrans.com/snap/v1/transactions';
-  static const String _apiSandboxBaseUrl = 'https://api.sandbox.midtrans.com/v2';
+  /// Opsional: alamat proxy lokal untuk Flutter Web (Chrome) agar tidak terkena CORS.
+  /// Jalankan: `dart run tool/midtrans_sandbox_proxy.dart`
+  static String webProxyBaseUrl = 'http://localhost:8787';
+
+  static String get _snapSandboxUrl => kIsWeb
+      ? '$webProxyBaseUrl/snap/v1/transactions'
+      : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
+
+  static String get _apiSandboxBaseUrl => kIsWeb
+      ? '$webProxyBaseUrl/v2'
+      : 'https://api.sandbox.midtrans.com/v2';
 
   final Map<String, MidtransOrderResult> _ordersCache = {};
 
@@ -226,8 +234,10 @@ class MidtransService {
     final orderId = 'FPX-${timestamp.substring(timestamp.length - 8)}';
     final vaNumber = _generateVirtualAccount(paymentMethod, customerPhone);
 
-    // Hanya panggil jaringan ke Midtrans Sandbox jika Server Key asli sudah diisi.
-    final isRealSandboxKey = !serverKey.contains('FinPaySandboxKey2026') &&
+    // Hanya panggil jaringan ke Midtrans Sandbox jika Server Key asli sudah diisi
+    // dan tidak sedang dalam mode unit test offline.
+    final isRealSandboxKey = FirebaseFirestoreConfig.isConfigured &&
+        !serverKey.contains('FinPaySandboxKey2026') &&
         serverKey.startsWith('SB-Mid-server-');
 
     if (isRealSandboxKey) {
@@ -305,7 +315,8 @@ class MidtransService {
 
   /// Mengecek status pembayaran order dari Midtrans Sandbox API (`GET /v2/{orderId}/status`).
   Future<String> checkPaymentStatus(String orderId) async {
-    final isRealSandboxKey = !serverKey.contains('FinPaySandboxKey2026') &&
+    final isRealSandboxKey = FirebaseFirestoreConfig.isConfigured &&
+        !serverKey.contains('FinPaySandboxKey2026') &&
         serverKey.startsWith('SB-Mid-server-');
 
     if (isRealSandboxKey) {
