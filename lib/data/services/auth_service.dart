@@ -187,10 +187,8 @@ class AuthService {
       pin: '123456',
     );
 
-    final baseCash =
-        recipientUserId == 'finpay_user_01' ? 12350000 : 5450000;
-    final baseSaving =
-        recipientUserId == 'finpay_user_01' ? 2500000 : 1200000;
+    final baseCash = recipientUserId == 'finpay_user_01' ? 12350000 : 0;
+    final baseSaving = recipientUserId == 'finpay_user_01' ? 2500000 : 0;
     final baseTransactions = recipientUserId == 'finpay_user_01'
         ? List<TransactionModel>.from(_initialRezaTransactions)
         : <TransactionModel>[];
@@ -359,9 +357,9 @@ class AuthService {
             : _initialRezaLoans,
       );
     } else if (resolvedProfile.userId == 'finpay_user_ali') {
-      // Data awal akun Ali Akbar
-      DummyData.cashBalance = firestoreCash ?? 5450000;
-      DummyData.savingBalance = firestoreSaving ?? 1200000;
+      // Akun Ali mulai dari saldo aktual Firestore (atau Rp 0 bila belum pernah top up/terima transfer)
+      DummyData.cashBalance = firestoreCash ?? 0;
+      DummyData.savingBalance = firestoreSaving ?? 0;
       DummyData.totalBalance =
           DummyData.cashBalance + DummyData.savingBalance;
       DummyData.transactions
