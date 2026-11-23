@@ -362,7 +362,8 @@ class AccountService {
     final cleanEmail = email.trim().toLowerCase();
 
     try {
-      final url = Uri.parse('${FirebaseFirestoreConfig.baseUrl}/users');
+      final url =
+          Uri.parse('${FirebaseFirestoreConfig.baseUrl}/users?pageSize=300');
       final response = await http.get(url).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
@@ -391,18 +392,21 @@ class AccountService {
   }
 
   /// Mencari pengguna berdasarkan Nomor HP (ternormalisasi) di koleksi `users` pada Firebase Firestore.
+  /// Jika terdapat beberapa dokumen dengan nomor HP yang sama, prioritaskan yang terbaru.
   Future<UserProfileModel?> findUserByPhoneFromFirestore(String phone) async {
     if (!FirebaseFirestoreConfig.isConfigured) return null;
     final normalizedTarget = _normalizePhoneDigits(phone);
     if (normalizedTarget.isEmpty) return null;
 
     try {
-      final url = Uri.parse('${FirebaseFirestoreConfig.baseUrl}/users');
+      final url =
+          Uri.parse('${FirebaseFirestoreConfig.baseUrl}/users?pageSize=300');
       final response = await http.get(url).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
         final docs = (decoded['documents'] as List<dynamic>?) ?? [];
+        UserProfileModel? latestMatch;
         for (final doc in docs) {
           final docMap = doc as Map<String, dynamic>;
           final fields = docMap['fields'] as Map<String, dynamic>?;
@@ -417,9 +421,65 @@ class AccountService {
             final docId = namePath.contains('/')
                 ? namePath.split('/').last
                 : (parsedMap['userId']?.toString() ?? 'finpay_user_01');
-            return UserProfileModel.fromMap(parsedMap, docId: docId);
+            latestMatch = UserProfileModel.fromMap(parsedMap, docId: docId);
           }
         }
+        return latestMatch;
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  /// Mencari akun penerima transfer berdasarkan teks tujuan (Nomor HP, Email, Nama, atau userId)
+  /// di koleksi `users` Firebase Firestore.
+  Future<UserProfileModel?> findUserByQueryFromFirestore(String query) async {
+    if (!FirebaseFirestoreConfig.isConfigured) return null;
+    final raw = query.trim();
+    if (raw.isEmpty) return null;
+
+    final lower = raw.toLowerCase();
+    final normDigits = _normalizePhoneDigits(raw);
+
+    try {
+      final url =
+          Uri.parse('${FirebaseFirestoreConfig.baseUrl}/users?pageSize=300');
+      final response = await http.get(url).timeout(const Duration(seconds: 6));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final docs = (decoded['documents'] as List<dynamic>?) ?? [];
+        UserProfileModel? bestMatch;
+
+        for (final doc in docs) {
+          final docMap = doc as Map<String, dynamic>;
+          final fields = docMap['fields'] as Map<String, dynamic>?;
+          if (fields == null) continue;
+
+          final parsedMap = fromFirestoreFields(fields);
+          final namePath = (docMap['name'] as String?) ?? '';
+          final docId = namePath.contains('/')
+              ? namePath.split('/').last
+              : (parsedMap['userId']?.toString() ?? '');
+          final profile = UserProfileModel.fromMap(parsedMap, docId: docId);
+
+          final docPhone = _normalizePhoneDigits(profile.phoneNumber);
+          final docEmail = profile.email.trim().toLowerCase();
+          final docName = profile.fullName.trim().toLowerCase();
+
+          final matchesPhone =
+              normDigits.length >= 8 && docPhone.isNotEmpty && docPhone == normDigits;
+          final matchesEmail =
+              lower.contains('@') && docEmail.isNotEmpty && docEmail == lower;
+          final matchesUid = docId == raw;
+          final matchesName = docName.isNotEmpty &&
+              (docName == lower || lower.contains(docName));
+
+          if (matchesUid || matchesPhone || matchesEmail || matchesName) {
+            bestMatch = profile;
+          }
+        }
+        return bestMatch;
       }
     } catch (_) {}
 

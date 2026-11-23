@@ -88,6 +88,7 @@ class TransactionService {
   }
 
   /// Mengambil riwayat transaksi dari koleksi `transactions` di Firebase Firestore.
+  /// Jika [userId] diberikan, hanya memuat transaksi milik akun tersebut.
   Future<List<TransactionModel>> fetchTransactionsFromFirebase({
     String? userId,
   }) async {
@@ -96,22 +97,38 @@ class TransactionService {
     }
 
     try {
-      final url = Uri.parse('${FirebaseFirestoreConfig.baseUrl}/transactions');
+      final url = Uri.parse(
+        '${FirebaseFirestoreConfig.baseUrl}/transactions?pageSize=300',
+      );
       final response = await http.get(url).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
         final documents = (decoded['documents'] as List<dynamic>?) ?? [];
         if (documents.isNotEmpty) {
-          final fetched = documents.map((doc) {
+          final targetUid = userId?.trim();
+          final fetched = <TransactionModel>[];
+          for (final doc in documents) {
             final fields =
-                (doc as Map<String, dynamic>)['fields'] as Map<String, dynamic>;
-            return TransactionModel.fromMap(_fromFirestoreFields(fields));
-          }).toList();
+                (doc as Map<String, dynamic>)['fields'] as Map<String, dynamic>?;
+            if (fields == null) continue;
+            final trx = TransactionModel.fromMap(_fromFirestoreFields(fields));
+            if (targetUid == null ||
+                targetUid.isEmpty ||
+                trx.userId == targetUid) {
+              fetched.add(trx);
+            }
+          }
 
-          DummyData.transactions
-            ..clear()
-            ..addAll(fetched);
+          if (targetUid != null && targetUid.isNotEmpty) {
+            DummyData.transactions
+              ..clear()
+              ..addAll(fetched.reversed);
+          } else {
+            DummyData.transactions
+              ..clear()
+              ..addAll(fetched.reversed);
+          }
           transactionsNotifier.value =
               List<TransactionModel>.from(DummyData.transactions);
         }

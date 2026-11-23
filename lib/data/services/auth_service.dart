@@ -262,9 +262,10 @@ class AuthService {
           }
         }
 
-        // Tarik transaksi milik userId ini dari koleksi transactions
-        final trxUrl =
-            Uri.parse('${FirebaseFirestoreConfig.baseUrl}/transactions');
+        // Tarik transaksi milik userId ini dari koleksi transactions (pageSize=300 agar tidak terpotong batas 20 dokumen)
+        final trxUrl = Uri.parse(
+          '${FirebaseFirestoreConfig.baseUrl}/transactions?pageSize=300',
+        );
         final trxResp =
             await http.get(trxUrl).timeout(const Duration(seconds: 5));
         if (trxResp.statusCode == 200) {
@@ -280,7 +281,7 @@ class AuthService {
               list.add(TransactionModel.fromMap(parsed));
             }
           }
-          firestoreTransactions = list;
+          firestoreTransactions = list.reversed.toList();
         }
 
         // Tarik rekening, target tabungan, dan pinjaman milik userId ini
