@@ -341,7 +341,7 @@ class _LoginPageState extends State<LoginPage> {
                 value: _remember,
                 onChanged: (v) => setState(() => _remember = v),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                activeColor: Colors.white,
+                activeThumbColor: Colors.white,
                 activeTrackColor: AppColors.primary,
               ),
             ),

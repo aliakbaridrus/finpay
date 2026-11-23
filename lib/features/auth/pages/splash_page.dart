@@ -27,7 +27,7 @@ class _SplashPageState extends State<SplashPage> {
   void initState() {
     super.initState();
     Future.delayed(
-      Duration(milliseconds: AuthConfig.skipToHome ? 0 : 1800),
+      const Duration(milliseconds: AuthConfig.skipToHome ? 0 : 1800),
       _goNext,
     );
   }
