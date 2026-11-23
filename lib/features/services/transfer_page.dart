@@ -5,7 +5,10 @@ import '../../core/theme/app_dimens.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../data/dummy/dummy_data.dart';
+import '../../data/models/wallet_model.dart';
 import '../../data/services/wallet_service.dart';
+import '../../shared/dialogs/widgets/finpay_receipt_dialog.dart';
+import '../../shared/dialogs/widgets/midtrans_snap_simulator_dialog.dart';
 import '../../shared/widgets/app_card.dart';
 
 /// Halaman Penuh 2: Kirim Uang / Transfer terintegrasi WalletService (Bagian Ali).
@@ -29,6 +32,18 @@ class _TransferPageState extends State<TransferPage>
 
   final List<Map<String, String>> _recentContacts = [
     {
+      'name': 'Ali Akbar',
+      'phone': '087841819117',
+      'initials': 'AA',
+      'bank': 'FinPay'
+    },
+    {
+      'name': 'Reza Pratama',
+      'phone': '0812-3456-7890',
+      'initials': 'RP',
+      'bank': 'FinPay'
+    },
+    {
       'name': 'Budi Santoso',
       'phone': '0812-9988-7766',
       'initials': 'BS',
@@ -46,13 +61,19 @@ class _TransferPageState extends State<TransferPage>
       'initials': 'EK',
       'bank': 'Mandiri'
     },
-    {
-      'name': 'Dewi Larasati',
-      'phone': '0821-8899-0011',
-      'initials': 'DL',
-      'bank': 'FinPay'
-    },
   ];
+
+  String _contactQuery = '';
+
+  List<Map<String, String>> get _filteredContacts {
+    final q = _contactQuery.trim().toLowerCase();
+    if (q.isEmpty) return _recentContacts;
+    return _recentContacts.where((c) {
+      return c['name']!.toLowerCase().contains(q) ||
+          c['phone']!.toLowerCase().contains(q) ||
+          c['bank']!.toLowerCase().contains(q);
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -71,87 +92,75 @@ class _TransferPageState extends State<TransferPage>
   }
 
   Future<void> _processTransfer() async {
-    final amount = int.tryParse(_amountController.text) ?? 250000;
+    final amount = int.tryParse(
+          _amountController.text
+              .replaceAll('.', '')
+              .replaceAll('Rp', '')
+              .trim(),
+        ) ??
+        0;
+    final recipient = _recipientController.text.trim();
+    if (recipient.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Masukkan nomor HP atau penerima tujuan.')),
+      );
+      return;
+    }
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nominal transfer harus lebih dari Rp 0.')),
+      );
+      return;
+    }
+    if (amount > DummyData.cashBalance) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saldo FinPay Cash kamu tidak mencukupi!')),
+      );
+      return;
+    }
+
+    // Gunakan Midtrans Snap Simulator sebagai jembatan pembayaran transfer
+    final bridgeResult = await showMidtransSnapSimulator(
+      context,
+      merchantTitle: 'FinPay Transfer',
+      amount: amount,
+      recipientLabel: recipient,
+    );
+    if (bridgeResult == null || !mounted) return;
+
     final timeFormatted = TimeOfDay.now().format(context);
 
     try {
       final trx = await WalletService.instance.transferMoney(
-        recipient: _recipientController.text,
+        recipient: recipient,
         amount: amount,
         isBankTransfer: _tabController.index == 1,
         timeFormatted: timeFormatted,
         note: _noteController.text,
+        midtransOrderId: bridgeResult.order.orderId,
+        midtransMethod: bridgeResult.paymentMethod,
       );
 
       if (!mounted) return;
 
-      showDialog<void>(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: AppRadius.xlAll),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: const BoxDecoration(
-                  color: AppColors.successLight,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle_rounded,
-                  size: 48,
-                  color: AppColors.success,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'Transfer Berhasil! 💸',
-                style: AppTextStyles.h2,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                CurrencyFormatter.rupiah(-amount, withSign: true),
-                style: AppTextStyles.displayLarge.copyWith(
-                  color: AppColors.danger,
-                  fontSize: 28,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'No. Ref: ${trx.referenceNumber}',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'Uang berhasil terkirim ke ${_recipientController.text}.\nSisa Saldo Cash: ${CurrencyFormatter.rupiah(DummyData.cashBalance)}',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    setState(() {});
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: const StadiumBorder(),
-                  ),
-                  child: const Text('Selesai'),
-                ),
-              ),
-            ],
-          ),
-        ),
+      await showFinPayReceiptDialog(
+        context,
+        title: 'Transfer via Midtrans Berhasil! 💸',
+        amountText: CurrencyFormatter.rupiah(-amount, withSign: true),
+        amountColor: AppColors.danger,
+        referenceNumber: trx.referenceNumber,
+        details: [
+          {'label': 'Order ID Midtrans', 'value': bridgeResult.order.orderId},
+          {'label': 'Metode Jembatan', 'value': bridgeResult.paymentMethod},
+          {'label': 'Penerima', 'value': recipient},
+          {'label': 'Status', 'value': 'SETTLEMENT'},
+          {
+            'label': 'Sisa Saldo Cash',
+            'value': CurrencyFormatter.rupiah(DummyData.cashBalance),
+          },
+        ],
       );
+      if (mounted) setState(() {});
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -221,6 +230,7 @@ class _TransferPageState extends State<TransferPage>
               ),
               child: TextField(
                 controller: _searchController,
+                onChanged: (v) => setState(() => _contactQuery = v),
                 style: AppTextStyles.body,
                 decoration: InputDecoration(
                   hintText: 'Cari Nama, No. HP, atau No. Rekening...',
@@ -245,9 +255,9 @@ class _TransferPageState extends State<TransferPage>
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
-                itemCount: _recentContacts.length,
+                itemCount: _filteredContacts.length,
                 itemBuilder: (context, index) {
-                  final contact = _recentContacts[index];
+                  final contact = _filteredContacts[index];
                   return GestureDetector(
                     onTap: () {
                       setState(() {
@@ -338,40 +348,45 @@ class _TransferPageState extends State<TransferPage>
             ),
             const SizedBox(height: AppSpacing.md),
 
-            // Sumber Dana Info Card
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.primarySoft,
-                borderRadius: AppRadius.mdAll,
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+            // Sumber Dana Info Card (Reaktif mengikuti WalletService)
+            ValueListenableBuilder<WalletModel>(
+              valueListenable: WalletService.instance.walletNotifier,
+              builder: (context, wallet, _) {
+                return Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: AppRadius.mdAll,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(
-                        Icons.account_balance_wallet_outlined,
-                        color: AppColors.primary,
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            'Sumber Dana: FinPay Cash',
+                            style: AppTextStyles.caption
+                                .copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: AppSpacing.xs),
                       Text(
-                        'Sumber Dana: FinPay Cash',
-                        style: AppTextStyles.caption
-                            .copyWith(fontWeight: FontWeight.bold),
+                        CurrencyFormatter.rupiah(wallet.cashBalance),
+                        style: AppTextStyles.label.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
-                  Text(
-                    CurrencyFormatter.rupiah(DummyData.cashBalance),
-                    style: AppTextStyles.label.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.xl),
 
