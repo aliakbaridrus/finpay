@@ -7,6 +7,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../data/dummy/dummy_data.dart';
 import '../../../data/services/wallet_service.dart';
 import '../widgets/finpay_receipt_dialog.dart';
+import '../widgets/midtrans_snap_simulator_dialog.dart';
 
 /// Bottom Sheet Kirim Uang / Transfer terhubung langsung ke [WalletService.transferMoney].
 class TransferActionSheet extends StatefulWidget {
@@ -59,6 +60,14 @@ class _TransferActionSheetState extends State<TransferActionSheet> {
     final nav = Navigator.of(context);
     final rootContext = nav.context;
 
+    final bridgeResult = await showMidtransSnapSimulator(
+      context,
+      merchantTitle: 'FinPay Transfer',
+      amount: amount,
+      recipientLabel: recipient,
+    );
+    if (bridgeResult == null || !mounted) return;
+
     setState(() => _isProcessing = true);
     try {
       final trx = await WalletService.instance.transferMoney(
@@ -67,6 +76,8 @@ class _TransferActionSheetState extends State<TransferActionSheet> {
         isBankTransfer: _isBankTransfer,
         timeFormatted: timeFormatted,
         note: _noteController.text,
+        midtransOrderId: bridgeResult.order.orderId,
+        midtransMethod: bridgeResult.paymentMethod,
       );
       widget.onSuccess?.call();
       if (!mounted) return;
