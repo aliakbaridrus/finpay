@@ -132,6 +132,26 @@
           }
         });
       };
+
+      // Event bridge untuk dart:html tanpa memerlukan dart:js_util
+      window.addEventListener('finpay-scan-video-request', async function () {
+        var videoEl = document.querySelector('video[data-finpay-scanner="true"]');
+        if (!videoEl) return;
+        var qrText = await window.finpayScanVideoFrame(videoEl);
+        if (qrText && qrText.indexOf('000201') !== -1) {
+          videoEl.setAttribute('data-qr-detected', qrText);
+          window.dispatchEvent(new CustomEvent('finpay-video-qr-detected', { detail: qrText }));
+        }
+      });
+
+      window.addEventListener('finpay-decode-image-request', async function () {
+        var holder = document.getElementById('finpay-qr-image-holder');
+        if (!holder) return;
+        var dataUrl = holder.getAttribute('data-url') || '';
+        var decoded = dataUrl ? await window.finpayDecodeQrImageDataUrl(dataUrl) : '';
+        holder.setAttribute('data-result', decoded || '');
+        window.dispatchEvent(new CustomEvent('finpay-image-qr-decoded'));
+      });
     })();
   </script>
 </head>

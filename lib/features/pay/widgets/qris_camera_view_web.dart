@@ -1,7 +1,6 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:async';
 import 'dart:html' as html;
-import 'dart:js_util' as js_util;
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
@@ -48,9 +47,9 @@ class _WebQrisCameraFeedState extends State<_WebQrisCameraFeed> {
   late final html.VideoElement _videoElement;
   html.MediaStream? _mediaStream;
   Timer? _scanTimer;
+  StreamSubscription<html.Event>? _qrEventSub;
   bool _hasStream = false;
   bool _isRequesting = false;
-  bool _isDecodingFrame = false;
   DateTime? _lastDetectedAt;
   String? _lastDetectedCode;
   String? _cameraError;
@@ -64,6 +63,7 @@ class _WebQrisCameraFeedState extends State<_WebQrisCameraFeed> {
       ..autoplay = true
       ..muted = true
       ..setAttribute('playsinline', 'true')
+      ..setAttribute('data-finpay-scanner', 'true')
       ..style.width = '100%'
       ..style.height = '100%'
       ..style.objectFit = 'cover';
@@ -72,6 +72,21 @@ class _WebQrisCameraFeedState extends State<_WebQrisCameraFeed> {
       _viewType,
       (int viewId) => _videoElement,
     );
+
+    _qrEventSub = html.window.on['finpay-video-qr-detected'].listen((_) {
+      final raw = (_videoElement.getAttribute('data-qr-detected') ?? '').trim();
+      if (raw.isNotEmpty && raw.contains('000201')) {
+        final now = DateTime.now();
+        final recentlySame = _lastDetectedCode == raw &&
+            _lastDetectedAt != null &&
+            now.difference(_lastDetectedAt!).inSeconds < 4;
+        if (!recentlySame && mounted) {
+          _lastDetectedCode = raw;
+          _lastDetectedAt = now;
+          widget.onQrDetected?.call(raw);
+        }
+      }
+    });
 
     if (widget.isActive) {
       _startCamera();
@@ -149,43 +164,13 @@ class _WebQrisCameraFeedState extends State<_WebQrisCameraFeed> {
     _scanTimer?.cancel();
     _scanTimer = Timer.periodic(
       const Duration(milliseconds: 400),
-      (_) => _scanCurrentFrame(),
-    );
-  }
-
-  Future<void> _scanCurrentFrame() async {
-    if (!_hasStream ||
-        !widget.isActive ||
-        _isDecodingFrame ||
-        widget.onQrDetected == null) {
-      return;
-    }
-
-    _isDecodingFrame = true;
-    try {
-      if (!js_util.hasProperty(html.window, 'finpayScanVideoFrame')) return;
-      final promise = js_util.callMethod<Object>(
-        html.window,
-        'finpayScanVideoFrame',
-        [_videoElement],
-      );
-      final result = await js_util.promiseToFuture<Object?>(promise);
-      final raw = (result?.toString() ?? '').trim();
-      if (raw.isNotEmpty && raw.contains('000201')) {
-        final now = DateTime.now();
-        final recentlySame = _lastDetectedCode == raw &&
-            _lastDetectedAt != null &&
-            now.difference(_lastDetectedAt!).inSeconds < 4;
-        if (!recentlySame && mounted) {
-          _lastDetectedCode = raw;
-          _lastDetectedAt = now;
-          widget.onQrDetected?.call(raw);
+      (_) {
+        if (!_hasStream || !widget.isActive || widget.onQrDetected == null) {
+          return;
         }
-      }
-    } catch (_) {
-    } finally {
-      _isDecodingFrame = false;
-    }
+        html.window.dispatchEvent(html.CustomEvent('finpay-scan-video-request'));
+      },
+    );
   }
 
   void _stopCamera() {
@@ -209,6 +194,7 @@ class _WebQrisCameraFeedState extends State<_WebQrisCameraFeed> {
 
   @override
   void dispose() {
+    _qrEventSub?.cancel();
     _scanTimer?.cancel();
     _scanTimer = null;
     final stream = _mediaStream;
