@@ -45,10 +45,10 @@ class AboutAppPage extends StatelessWidget {
             const Text('Versi 1.0.0 (Build 202410)', style: TextStyle(color: AppColors.textSecondary)),
             const SizedBox(height: AppSpacing.section),
 
-            AppCard(
-              padding: const EdgeInsets.all(AppSpacing.lg),
+            const AppCard(
+              padding: EdgeInsets.all(AppSpacing.lg),
               child: Column(
-                children: const [
+                children: [
                   ListTile(
                     title: Text('Status Perizinan', style: TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text('Berizin & Diawasi oleh OJK dan Bank Indonesia'),
